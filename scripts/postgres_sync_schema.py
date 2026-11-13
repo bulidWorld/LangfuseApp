@@ -300,14 +300,24 @@ def main():
                 pending.append((f"column-add-{table_name}-{column_name}", item))
             # Existing columns are intentionally retained. XML synchronization
             # only adds missing columns and never deletes user/data columns.
-        # Add missing columns before comments, indexes, foreign keys, or raw SQL
-        # can refer to them. Table creation statements are already applied above
-        # this point when a table is new; additions only target existing tables.
+        # Add missing columns after extensions and enums, but before comments,
+        # indexes, foreign keys, or raw SQL can refer to them. Table creation
+        # statements are already applied above this point when a table is new;
+        # additions only target existing tables.
         pending_by_id = dict(pending)
         column_additions = [(i, s) for i, s in pending if i.startswith("column-add-")]
-        ordered = list(column_additions)
+        dependency_ids = {
+            ident for ident, _ in statements
+            if "-extension-" in ident or "-enum-" in ident
+        }
+        ordered = [
+            (ident, pending_by_id[ident])
+            for ident, _ in statements
+            if ident in dependency_ids and ident in pending_by_id
+        ]
+        ordered.extend(column_additions)
         for ident, sql in statements:
-            if ident in pending_by_id:
+            if ident in pending_by_id and ident not in dependency_ids:
                 ordered.append((ident, pending_by_id[ident]))
         pending = ordered
         generated = "\n\n".join(f"-- {i}\n{s};" for i, s in pending) + ("\n" if pending else "")
