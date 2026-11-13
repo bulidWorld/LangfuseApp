@@ -1,24 +1,21 @@
-FROM --platform=${TARGETPLATFORM:-linux/amd64} node:20-alpine AS alpine
-
-# It's important to update the index before installing packages to ensure you're getting the latest versions.
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk update && apk upgrade --no-cache libcrypto3 libssl3 libc6-compat busybox ssl_client
-
-FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine AS base
+FROM node:20-bookworm-slim AS base
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 RUN npm install turbo@^2.5.6 --global
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 RUN corepack prepare pnpm@9.5.0 --activate
 
-FROM --platform=${TARGETPLATFORM:-linux/amd64} base AS pruner
+FROM base AS pruner
 
 WORKDIR /app
 
 COPY . .
 RUN turbo prune --scope=web --docker
 
-FROM --platform=${TARGETPLATFORM:-linux/amd64} base AS builder
+FROM base AS builder
 
 WORKDIR /app
 
@@ -29,8 +26,8 @@ COPY --from=pruner /app/out/json/ .
 
 RUN pnpm install --frozen-lockfile
 
-ENV DOCKER_BUILD 1
-ENV NEXT_MANUAL_SIG_HANDLE true
+ENV DOCKER_BUILD=1
+ENV NEXT_MANUAL_SIG_HANDLE=true
 
 # pass public variables in build step
 ARG NEXT_PUBLIC_PLAIN_APP_ID
@@ -59,8 +56,6 @@ ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
 
 # Sentry already needs to be set on build time to upload sourcemaps
 # This must not be set for OSS releases as we would share our Sentry secret.
-ARG SENTRY_AUTH_TOKEN
-ENV SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN
 ARG SENTRY_ORG
 ENV SENTRY_ORG=$SENTRY_ORG
 ARG SENTRY_PROJECT
@@ -80,18 +75,19 @@ RUN rm -f ./web/src/middleware.ts
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
 # Uncomment the following line in case you want to disable telemetry during the build.
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV NEXT_MANUAL_SIG_HANDLE true
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_MANUAL_SIG_HANDLE=true
 # set the CI flag to true to get CI specific logs
-ENV CI true
+ENV CI=true
 
-RUN NODE_OPTIONS='--max-old-space-size=8192' turbo run build --filter=web...
+RUN --mount=type=secret,id=sentry_auth_token,required=false \
+    if [ -f /run/secrets/sentry_auth_token ]; then \
+        export SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token)"; \
+    fi && \
+    NODE_OPTIONS='--max-old-space-size=8192' turbo run build --filter=web...
 
 # Production image, copy all the files and run next
-FROM --platform=${TARGETPLATFORM:-linux/amd64} base AS runner
-
-ARG TARGETPLATFORM
-ARG BUILDPLATFORM
+FROM base AS runner
 
 WORKDIR /app
 
@@ -100,15 +96,17 @@ ENV BUILD_ID=$NEXT_PUBLIC_BUILD_ID
 ARG NEXT_PUBLIC_LANGFUSE_CLOUD_REGION
 ENV NEXT_PUBLIC_LANGFUSE_CLOUD_REGION=$NEXT_PUBLIC_LANGFUSE_CLOUD_REGION
 
-ENV NODE_ENV production
+ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 # Needed to re-enable validation of environment variables during runtime
-ENV DOCKER_BUILD 0
+ENV DOCKER_BUILD=0
 # Set NEXT_MANUAL_SIG_HANDLE for runtime
-ENV NEXT_MANUAL_SIG_HANDLE true
+ENV NEXT_MANUAL_SIG_HANDLE=true
 
-RUN apk add --no-cache dumb-init tzdata python3 py3-pip
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends dumb-init tzdata python3 python3-pip && \
+    rm -rf /var/lib/apt/lists/*
 COPY ./scripts/requirements.txt ./scripts/requirements.txt
 RUN python3 -m pip install --break-system-packages --no-cache-dir -r ./scripts/requirements.txt
 
@@ -116,7 +114,7 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir -r ./scripts/r
 ARG UID=1001
 ARG GID=1001
 RUN addgroup --system --gid ${GID} nodejs
-RUN adduser --system --uid ${UID} nextjs
+RUN adduser --system --uid ${UID} --ingroup nodejs nextjs
 
 # Install dd-trace only if NEXT_PUBLIC_LANGFUSE_CLOUD_REGION is configured
 ARG NEXT_PUBLIC_LANGFUSE_CLOUD_REGION
@@ -144,15 +142,11 @@ RUN chmod +x ./web/entrypoint.sh
 USER nextjs
 
 # Default port to 3000
-ENV PORT 3000
+ENV PORT=3000
 
 # Docker ENTRYPOINT (dumb-init) is covered by semantic versioning, not the entrypoint.sh itself
 # Reasoning: ENTRYPOINT is overridden by some self-hosted deployments, thus changing this is breaking
 ENTRYPOINT ["dumb-init", "--", "./web/entrypoint.sh"]
 
 # startup command - use dd-trace if NEXT_PUBLIC_LANGFUSE_CLOUD_REGION is configured
-CMD if [ -n "$NEXT_PUBLIC_LANGFUSE_CLOUD_REGION" ]; then \
-      node --import dd-trace/initialize.mjs ./web/server.js --keepAliveTimeout 110000; \
-    else \
-      node ./web/server.js --keepAliveTimeout 110000; \
-    fi
+CMD ["sh", "-c", "if [ -n \"$NEXT_PUBLIC_LANGFUSE_CLOUD_REGION\" ]; then exec node --import dd-trace/initialize.mjs ./web/server.js --keepAliveTimeout 110000; else exec node ./web/server.js --keepAliveTimeout 110000; fi"]
