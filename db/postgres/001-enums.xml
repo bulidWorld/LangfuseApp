@@ -1,0 +1,125 @@
+<?xml version='1.0' encoding='utf-8'?>
+<database xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="langfuse" source="packages/shared/prisma/schema.prisma" dialect="postgresql" xsi:noNamespaceSchemaLocation="database.xsd">
+  <enums>
+    <enum name="ApiKeyScope">
+      <value>ORGANIZATION</value>
+      <value>PROJECT</value>
+    </enum>
+    <enum name="Role">
+      <value>OWNER</value>
+      <value>ADMIN</value>
+      <value>MEMBER</value>
+      <value>VIEWER</value>
+      <value>NONE</value>
+    </enum>
+    <enum name="ObservationType">
+      <value>SPAN</value>
+      <value>EVENT</value>
+      <value>GENERATION</value>
+      <value>AGENT</value>
+      <value>TOOL</value>
+      <value>CHAIN</value>
+      <value>RETRIEVER</value>
+      <value>EVALUATOR</value>
+      <value>EMBEDDING</value>
+      <value>GUARDRAIL</value>
+    </enum>
+    <enum name="ObservationLevel">
+      <value>DEBUG</value>
+      <value>DEFAULT</value>
+      <value>WARNING</value>
+      <value>ERROR</value>
+    </enum>
+    <enum name="ScoreSource">
+      <value>ANNOTATION</value>
+      <value>API</value>
+      <value>EVAL</value>
+    </enum>
+    <enum name="ScoreDataType">
+      <value>CATEGORICAL</value>
+      <value>NUMERIC</value>
+      <value>BOOLEAN</value>
+    </enum>
+    <enum name="AnnotationQueueStatus">
+      <value>PENDING</value>
+      <value>COMPLETED</value>
+    </enum>
+    <enum name="AnnotationQueueObjectType">
+      <value>TRACE</value>
+      <value>OBSERVATION</value>
+      <value>SESSION</value>
+    </enum>
+    <enum name="DatasetStatus">
+      <value>ACTIVE</value>
+      <value>ARCHIVED</value>
+    </enum>
+    <enum name="CommentObjectType">
+      <value>TRACE</value>
+      <value>OBSERVATION</value>
+      <value>SESSION</value>
+      <value>PROMPT</value>
+    </enum>
+    <enum name="AuditLogRecordType">
+      <value>USER</value>
+      <value>API_KEY</value>
+    </enum>
+    <enum name="JobType">
+      <value>EVAL</value>
+    </enum>
+    <enum name="JobConfigState">
+      <value>ACTIVE</value>
+      <value>INACTIVE</value>
+    </enum>
+    <enum name="JobExecutionStatus">
+      <value>COMPLETED</value>
+      <value>ERROR</value>
+      <value>PENDING</value>
+      <value>CANCELLED</value>
+    </enum>
+    <enum name="BlobStorageIntegrationFileType">
+      <value>JSON</value>
+      <value>CSV</value>
+      <value>JSONL</value>
+    </enum>
+    <enum name="BlobStorageIntegrationType">
+      <value>S3</value>
+      <value>S3_COMPATIBLE</value>
+      <value>AZURE_BLOB_STORAGE</value>
+    </enum>
+    <enum name="BlobStorageExportMode">
+      <value>FULL_HISTORY</value>
+      <value>FROM_TODAY</value>
+      <value>FROM_CUSTOM_DATE</value>
+    </enum>
+    <enum name="DashboardWidgetViews">
+      <value>TRACES</value>
+      <value>OBSERVATIONS</value>
+      <value>SCORES_NUMERIC</value>
+      <value>SCORES_CATEGORICAL</value>
+    </enum>
+    <enum name="DashboardWidgetChartType">
+      <value>LINE_TIME_SERIES</value>
+      <value>BAR_TIME_SERIES</value>
+      <value>HORIZONTAL_BAR</value>
+      <value>VERTICAL_BAR</value>
+      <value>PIE</value>
+      <value>NUMBER</value>
+      <value>HISTOGRAM</value>
+      <value>PIVOT_TABLE</value>
+    </enum>
+    <enum name="ActionType">
+      <value>WEBHOOK</value>
+      <value>SLACK</value>
+    </enum>
+    <enum name="ActionExecutionStatus">
+      <value>COMPLETED</value>
+      <value>ERROR</value>
+      <value>PENDING</value>
+      <value>CANCELLED</value>
+    </enum>
+    <enum name="SurveyName">
+      <value>org_onboarding</value>
+      <value>user_onboarding</value>
+    </enum>
+  </enums>
+</database>

@@ -1,0 +1,113 @@
+<?xml version='1.0' encoding='utf-8'?>
+<database xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="langfuse" source="packages/shared/prisma/schema.prisma" dialect="postgresql" xsi:noNamespaceSchemaLocation="database.xsd">
+  <tables>
+    <table name="actions">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="type" type="&quot;ActionType&quot;" nullable="false" />
+        <column name="config" type="JSONB" nullable="false" />
+      </columns>
+      <constraints>
+        <primary-key name="actions_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="actions_project_id_idx" unique="false">
+          <column name="project_id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="triggers">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="eventSource" type="TEXT" nullable="false" />
+        <column name="eventActions" type="TEXT[]" nullable="true" />
+        <column name="filter" type="JSONB" nullable="true" />
+        <column name="status" type="&quot;JobConfigState&quot; NOT NULL" nullable="true" default="'ACTIVE'" />
+      </columns>
+      <constraints>
+        <primary-key name="triggers_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="triggers_project_id_idx" unique="false">
+          <column name="project_id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="automations">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="trigger_id" type="TEXT" nullable="false" ref-table="triggers" ref-col="id" />
+        <column name="action_id" type="TEXT" nullable="false" ref-table="actions" ref-col="id" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+      </columns>
+      <constraints>
+        <primary-key name="automations_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="automations_project_id_action_id_trigger_id_idx" unique="false">
+          <column name="project_id" />
+          <column name="action_id" />
+          <column name="trigger_id" />
+        </index>
+        <index name="automations_project_id_name_idx" unique="false">
+          <column name="project_id" />
+          <column name="name" />
+        </index>
+      </indexes>
+    </table>
+    <table name="automation_executions">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="source_id" type="TEXT" nullable="false" />
+        <column name="automation_id" type="TEXT" nullable="false" ref-table="automations" ref-col="id" />
+        <column name="trigger_id" type="TEXT" nullable="false" ref-table="triggers" ref-col="id" />
+        <column name="action_id" type="TEXT" nullable="false" ref-table="actions" ref-col="id" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="status" type="&quot;ActionExecutionStatus&quot; NOT NULL" nullable="true" default="'PENDING'" />
+        <column name="input" type="JSONB" nullable="false" />
+        <column name="output" type="JSONB" nullable="true" />
+        <column name="started_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="finished_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="error" type="TEXT" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="automation_executions_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="automation_executions_trigger_id_idx" unique="false">
+          <column name="trigger_id" />
+        </index>
+        <index name="automation_executions_action_id_idx" unique="false">
+          <column name="action_id" />
+        </index>
+        <index name="automation_executions_project_id_idx" unique="false">
+          <column name="project_id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="surveys">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="survey_name" type="&quot;SurveyName&quot;" nullable="false" />
+        <column name="response" type="JSONB" nullable="false" />
+        <column name="user_id" type="TEXT" nullable="true" ref-table="users" ref-col="id" />
+        <column name="user_email" type="TEXT" nullable="true" />
+        <column name="org_id" type="TEXT" nullable="true" ref-table="organizations" ref-col="id" />
+      </columns>
+      <constraints>
+        <primary-key name="surveys_pkey" columns="id" />
+      </constraints>
+    </table>
+  </tables>
+</database>

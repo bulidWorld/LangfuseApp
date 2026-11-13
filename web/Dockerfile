@@ -108,7 +108,9 @@ ENV DOCKER_BUILD 0
 # Set NEXT_MANUAL_SIG_HANDLE for runtime
 ENV NEXT_MANUAL_SIG_HANDLE true
 
-RUN apk add --no-cache dumb-init tzdata
+RUN apk add --no-cache dumb-init tzdata python3 py3-pip
+COPY ./scripts/requirements.txt ./scripts/requirements.txt
+RUN python3 -m pip install --break-system-packages --no-cache-dir -r ./scripts/requirements.txt
 
 # Don't run production as root
 ARG UID=1001
@@ -116,17 +118,11 @@ ARG GID=1001
 RUN addgroup --system --gid ${GID} nodejs
 RUN adduser --system --uid ${UID} nextjs
 
-RUN npm install -g --no-package-lock --no-save prisma@6.3.0
-
 # Install dd-trace only if NEXT_PUBLIC_LANGFUSE_CLOUD_REGION is configured
 ARG NEXT_PUBLIC_LANGFUSE_CLOUD_REGION
 RUN if [ -n "$NEXT_PUBLIC_LANGFUSE_CLOUD_REGION" ]; then \
         npm install --no-package-lock --no-save dd-trace@5.36.0; \
     fi
-
-RUN MIGRATE_TARGET_ARCH=$(echo ${TARGETPLATFORM:-linux/amd64} | sed 's/\//-/g') && \
-    wget -q -O- https://github.com/golang-migrate/migrate/releases/download/v4.18.3/migrate.$MIGRATE_TARGET_ARCH.tar.gz | tar xvz && \
-    mv migrate /usr/bin/migrate
 
 COPY --from=builder --chown=nextjs:nodejs /app/web/next.config.mjs .
 COPY --from=builder --chown=nextjs:nodejs /app/web/package.json .
@@ -138,10 +134,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./web/.next/stat
 COPY --from=builder --chown=nextjs:nodejs /app/web/public ./web/public
 
 COPY --from=builder --chown=nextjs:nodejs /app/packages/shared/prisma ./packages/shared/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/packages/shared/clickhouse ./packages/shared/clickhouse
+COPY --chown=nextjs:nodejs ./db ./db
+COPY --chown=nextjs:nodejs ./scripts/postgres_sync_schema.py ./scripts/postgres_sync_schema.py
+COPY --chown=nextjs:nodejs ./scripts/clickhouse_sync_schema.py ./scripts/clickhouse_sync_schema.py
 
 COPY --chown=nextjs:nodejs ./web/entrypoint.sh ./web/entrypoint.sh
-COPY --chown=nextjs:nodejs ./packages/shared/scripts/cleanup.sql ./packages/shared/scripts/cleanup.sql
 RUN chmod +x ./web/entrypoint.sh
 
 USER nextjs

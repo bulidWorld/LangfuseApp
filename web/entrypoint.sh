@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Run cleanup script before running migrations
+# Build DATABASE_URL from the supported individual database variables when needed.
 # Check if DATABASE_URL is not set
 if [ -z "$DATABASE_URL" ]; then
     # Check if all required variables are provided
@@ -25,39 +25,28 @@ if [ -z "$CLICKHOUSE_URL" ]; then
     exit 1
 fi
 
-# Set DIRECT_URL to the value of DATABASE_URL if it is not set, required for migrations
-if [ -z "$DIRECT_URL" ]; then
-    export DIRECT_URL="${DATABASE_URL}"
-fi
-
-# Always execute the postgres migration, except when disabled.
+# Synchronize PostgreSQL from the project XML schema, except when disabled.
 if [ "$LANGFUSE_AUTO_POSTGRES_MIGRATION_DISABLED" != "true" ]; then
-    prisma db execute --url "$DIRECT_URL" --file "./packages/shared/scripts/cleanup.sql"
-
-    # Apply migrations
-    prisma migrate deploy --schema=./packages/shared/prisma/schema.prisma
+    python3 ./scripts/postgres_sync_schema.py
 fi
 status=$?
 
-# If migration fails (returns non-zero exit status), exit script with that status
+# If schema synchronization fails, exit with that status.
 if [ $status -ne 0 ]; then
-    echo "Applying database migrations failed. This is mostly caused by the database being unavailable."
+    echo "Synchronizing the PostgreSQL XML schema failed. This is mostly caused by the database being unavailable."
     echo "Exiting..."
     exit $status
 fi
 
-# Execute the Clickhouse migration, except when disabled.
+# Synchronize ClickHouse from the project XML schema, except when disabled.
 if [ "$LANGFUSE_AUTO_CLICKHOUSE_MIGRATION_DISABLED" != "true" ]; then
-    # Apply Clickhouse migrations
-    cd ./packages/shared
-    sh ./clickhouse/scripts/up.sh
+    python3 ./scripts/clickhouse_sync_schema.py --dir ./db/clickhouse
     status=$?
-    cd ../../
 fi
 
-# If migration fails (returns non-zero exit status), exit script with that status
+# If schema synchronization fails, exit with that status.
 if [ $status -ne 0 ]; then
-    echo "Applying clickhouse migrations failed. This is mostly caused by the database being unavailable."
+    echo "Synchronizing the ClickHouse XML schema failed. This is mostly caused by the database being unavailable."
     echo "Exiting..."
     exit $status
 fi

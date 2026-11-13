@@ -1,0 +1,85 @@
+<?xml version='1.0' encoding='utf-8'?>
+<database xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="langfuse" source="packages/shared/prisma/schema.prisma" dialect="postgresql" xsi:noNamespaceSchemaLocation="database.xsd">
+  <tables>
+    <table name="media">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="sha_256_hash" type="CHAR(44)" nullable="false" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="uploaded_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="upload_http_status" type="INTEGER" nullable="true" />
+        <column name="upload_http_error" type="TEXT" nullable="true" />
+        <column name="bucket_path" type="TEXT" nullable="false" />
+        <column name="bucket_name" type="TEXT" nullable="false" />
+        <column name="content_type" type="TEXT" nullable="false" />
+        <column name="content_length" type="BIGINT" nullable="false" />
+      </columns>
+      <indexes>
+        <index name="media_project_id_id_key" unique="true">
+          <column name="project_id" />
+          <column name="id" />
+        </index>
+        <index name="media_project_id_sha_256_hash_key" unique="true">
+          <column name="project_id" />
+          <column name="sha_256_hash" />
+        </index>
+      </indexes>
+    </table>
+    <table name="trace_media">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="media" ref-col="project_id" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="media_id" type="TEXT" nullable="false" ref-table="media" ref-col="id" />
+        <column name="trace_id" type="TEXT" nullable="false" />
+        <column name="field" type="TEXT" nullable="false" />
+      </columns>
+      <constraints>
+        <primary-key name="trace_media_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="trace_media_project_id_media_id_idx" unique="false">
+          <column name="project_id" />
+          <column name="media_id" />
+        </index>
+        <index name="trace_media_project_id_trace_id_media_id_field_key" unique="true">
+          <column name="project_id" />
+          <column name="trace_id" />
+          <column name="media_id" />
+          <column name="field" />
+        </index>
+      </indexes>
+    </table>
+    <table name="observation_media">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="media" ref-col="project_id" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="media_id" type="TEXT" nullable="false" ref-table="media" ref-col="id" />
+        <column name="trace_id" type="TEXT" nullable="false" />
+        <column name="observation_id" type="TEXT" nullable="false" />
+        <column name="field" type="TEXT" nullable="false" />
+      </columns>
+      <constraints>
+        <primary-key name="observation_media_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="observation_media_project_id_media_id_idx" unique="false">
+          <column name="project_id" />
+          <column name="media_id" />
+        </index>
+        <index name="observation_media_project_id_trace_id_observation_id_media__key" unique="true">
+          <column name="project_id" />
+          <column name="trace_id" />
+          <column name="observation_id" />
+          <column name="media_id" />
+          <column name="field" />
+        </index>
+      </indexes>
+    </table>
+  </tables>
+</database>

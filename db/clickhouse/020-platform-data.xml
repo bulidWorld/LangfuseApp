@@ -1,0 +1,126 @@
+<?xml version='1.0' encoding='utf-8'?>
+<database name="langfuse" source="packages/shared/clickhouse/migrations/{clustered,unclustered}/*.up.sql" dialect="clickhouse">
+  <tables>
+    <table name="event_log" on-cluster="default" comment="旧版事件文件引用日志，记录实体对应的对象存储位置，作为迁移到 blob_storage_file_log 的数据来源。">
+      <columns>
+        <column name="id" type="String" comment="旧版事件文件日志记录标识。" />
+        <column name="project_id" type="String" comment="Langfuse 项目标识，用于隔离和筛选项目数据。" />
+        <column name="entity_type" type="String" comment="被引用文件所属实体类型，例如 trace、observation 或 score。" />
+        <column name="entity_id" type="String" comment="被引用文件所属实体的标识。" />
+        <column name="event_id" type="Nullable(String)" comment="上传队列事件标识；旧版队列记录可能为空。" />
+        <column name="bucket_name" type="String" comment="对象存储 bucket 名称。" />
+        <column name="bucket_path" type="String" comment="对象存储中的文件路径或对象键。" />
+        <column name="created_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录首次创建时间。" />
+        <column name="updated_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录最近一次业务更新时间。" />
+      </columns>
+      <engine>
+        <Cluster type="MergeTree()" />
+        <UnCluster type="MergeTree()" />
+      </engine>
+      <order-by>(
+                project_id,
+                entity_type,
+                entity_id
+          )</order-by>
+    </table>
+    <table name="project_environments" on-cluster="default" comment="按项目汇总 environment 唯一值的聚合表，由 traces、observations 和 scores 的物化视图写入。">
+      <columns>
+        <column name="project_id" type="String" comment="Langfuse 项目标识，用于隔离和筛选项目数据。" />
+        <column name="environments" type="SimpleAggregateFunction(groupUniqArrayArray, Array(String))" comment="项目中出现过的 environment 去重集合。" />
+      </columns>
+      <engine>
+        <Cluster type="ReplicatedAggregatingMergeTree" />
+        <UnCluster type="AggregatingMergeTree" />
+      </engine>
+      <order-by>(project_id)</order-by>
+    </table>
+    <table name="blob_storage_file_log" on-cluster="default" comment="实体关联的对象存储文件引用表，供按项目和实体查找上传的事件文件。">
+      <columns>
+        <column name="id" type="String" comment="对象存储文件引用记录标识。" />
+        <column name="project_id" type="String" comment="Langfuse 项目标识，用于隔离和筛选项目数据。" />
+        <column name="entity_type" type="String" comment="被引用文件所属实体类型，例如 trace、observation 或 score。" />
+        <column name="entity_id" type="String" comment="被引用文件所属实体的标识。" />
+        <column name="event_id" type="String" comment="产生文件引用的上传事件标识；兼容旧版数据时可为空。" />
+        <column name="bucket_name" type="String" comment="对象存储 bucket 名称。" />
+        <column name="bucket_path" type="String" comment="对象存储中的文件路径或对象键。" />
+        <column name="created_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录首次创建时间。" />
+        <column name="updated_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录最近一次业务更新时间。" />
+        <column name="event_ts" type="DateTime64(3)" comment="文件引用记录的版本时间，用于 ReplacingMergeTree 合并版本。" />
+        <column name="is_deleted" type="UInt8" comment="软删除标记；1 表示该文件引用已删除，0 表示有效。" />
+      </columns>
+      <engine>
+        <Cluster type="ReplicatedReplacingMergeTree(event_ts, is_deleted)" />
+        <UnCluster type="ReplacingMergeTree(event_ts, is_deleted)" />
+      </engine>
+      <order-by>(
+                project_id,
+                entity_type,
+                entity_id,
+                event_id
+          )</order-by>
+    </table>
+    <table name="dataset_run_items" on-cluster="default" comment="旧版数据集运行项快照表，保存运行、数据集项和关联 trace 的信息。">
+      <columns>
+        <column name="id" type="String" comment="数据集运行项记录标识。" />
+        <column name="project_id" type="String" comment="Langfuse 项目标识，用于隔离和筛选项目数据。" />
+        <column name="dataset_run_id" type="String" comment="关联的数据集运行标识。" />
+        <column name="dataset_item_id" type="String" comment="关联的数据集项标识。" />
+        <column name="dataset_id" type="String" comment="所属数据集标识。" />
+        <column name="trace_id" type="String" comment="运行项关联的 trace 标识。" />
+        <column name="observation_id" type="Nullable(String)" comment="关联的 observation 标识；可空表示不关联 observation。" />
+        <column name="error" type="Nullable(String)" comment="数据集运行项执行失败时记录的错误信息。" />
+        <column name="created_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录首次创建时间。" />
+        <column name="updated_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录最近一次业务更新时间。" />
+        <column name="dataset_run_name" type="String" comment="数据集运行名称快照，保留运行创建时的名称。" />
+        <column name="dataset_run_description" type="Nullable(String)" comment="数据集运行描述快照。" />
+        <column name="dataset_run_metadata" type="Map(LowCardinality(String), String)" comment="数据集运行元数据快照。" />
+        <column name="dataset_run_created_at" type="DateTime64(3)" comment="数据集运行的创建时间快照。" />
+        <column name="dataset_item_input" type="Nullable(String)" codec="(ZSTD(3))" comment="数据集项输入内容快照，通常为序列化后的 JSON 字符串。" />
+        <column name="dataset_item_expected_output" type="Nullable(String)" codec="(ZSTD(3))" comment="数据集项预期输出快照，通常为序列化后的 JSON 字符串。" />
+        <column name="dataset_item_metadata" type="Map(LowCardinality(String), String)" comment="数据集项元数据快照。" />
+        <column name="event_ts" type="DateTime64(3)" comment="记录变更版本时间，用于 ReplacingMergeTree 选择较新的版本。" />
+        <column name="is_deleted" type="UInt8" comment="软删除标记；1 表示记录已删除，0 表示有效。" />
+      </columns>
+      <indexes>
+        <index name="idx_dataset_item" expression="dataset_item_id" type="bloom_filter(0.001)" granularity="1" />
+      </indexes>
+      <engine>
+        <Cluster type="ReplacingMergeTree(event_ts, is_deleted)" />
+        <UnCluster type="ReplacingMergeTree(event_ts, is_deleted)" />
+      </engine>
+      <order-by>(project_id, dataset_id, dataset_run_id, id)</order-by>
+    </table>
+    <table name="dataset_run_items_rmt" on-cluster="default" comment="当前数据集运行项表，使用 ReplacingMergeTree 保存运行项快照和删除标记。">
+      <columns>
+        <column name="id" type="String" comment="数据集运行项记录标识。" />
+        <column name="project_id" type="String" comment="Langfuse 项目标识，用于隔离和筛选项目数据。" />
+        <column name="dataset_run_id" type="String" comment="关联的数据集运行标识。" />
+        <column name="dataset_item_id" type="String" comment="关联的数据集项标识。" />
+        <column name="dataset_id" type="String" comment="所属数据集标识。" />
+        <column name="trace_id" type="String" comment="运行项关联的 trace 标识，用于回查 trace。" />
+        <column name="observation_id" type="Nullable(String)" comment="关联的 observation 标识；可空表示不关联 observation。" />
+        <column name="error" type="Nullable(String)" comment="数据集运行项执行失败时记录的错误信息。" />
+        <column name="created_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录首次创建时间。" />
+        <column name="updated_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录最近一次业务更新时间。" />
+        <column name="dataset_run_name" type="String" comment="数据集运行名称快照，保留运行创建时的名称。" />
+        <column name="dataset_run_description" type="Nullable(String)" comment="数据集运行描述快照。" />
+        <column name="dataset_run_metadata" type="Map(LowCardinality(String), String)" comment="数据集运行元数据快照。" />
+        <column name="dataset_run_created_at" type="DateTime64(3)" comment="数据集运行的创建时间快照。" />
+        <column name="dataset_item_input" type="Nullable(String)" codec="(ZSTD(3))" comment="数据集项输入内容快照，通常为序列化后的 JSON 字符串。" />
+        <column name="dataset_item_expected_output" type="Nullable(String)" codec="(ZSTD(3))" comment="数据集项预期输出快照，通常为序列化后的 JSON 字符串。" />
+        <column name="dataset_item_metadata" type="Map(LowCardinality(String), String)" comment="数据集项元数据快照。" />
+        <column name="event_ts" type="DateTime64(3)" comment="运行项变更版本时间，用于 ReplacingMergeTree 选择较新快照。" />
+        <column name="is_deleted" type="UInt8" comment="软删除标记；1 表示记录已删除，0 表示有效。" />
+      </columns>
+      <indexes>
+        <index name="idx_dataset_item" expression="dataset_item_id" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_trace_id" expression="trace_id" type="bloom_filter(0.001)" granularity="1" materialize="true" />
+      </indexes>
+      <engine>
+        <Cluster type="ReplicatedReplacingMergeTree(event_ts, is_deleted)" />
+        <UnCluster type="ReplacingMergeTree(event_ts, is_deleted)" />
+      </engine>
+      <order-by>(project_id, dataset_id, dataset_run_id, id)</order-by>
+    </table>
+  </tables>
+</database>

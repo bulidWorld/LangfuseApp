@@ -1,0 +1,69 @@
+<?xml version='1.0' encoding='utf-8'?>
+<database xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="langfuse" source="packages/shared/prisma/schema.prisma" dialect="postgresql" xsi:noNamespaceSchemaLocation="database.xsd">
+  <tables>
+    <table name="dashboards">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="created_by" type="TEXT" nullable="true" ref-table="users" ref-col="id" />
+        <column name="updated_by" type="TEXT" nullable="true" ref-table="users" ref-col="id" />
+        <column name="project_id" type="TEXT" nullable="true" ref-table="projects" ref-col="id" />
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="description" type="TEXT" nullable="false" />
+        <column name="definition" type="JSONB" nullable="false" />
+      </columns>
+      <constraints>
+        <primary-key name="dashboards_pkey" columns="id" />
+      </constraints>
+    </table>
+    <table name="dashboard_widgets">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="created_by" type="TEXT" nullable="true" ref-table="users" ref-col="id" />
+        <column name="updated_by" type="TEXT" nullable="true" ref-table="users" ref-col="id" />
+        <column name="project_id" type="TEXT" nullable="true" ref-table="projects" ref-col="id" />
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="description" type="TEXT" nullable="false" />
+        <column name="view" type="&quot;DashboardWidgetViews&quot;" nullable="false" />
+        <column name="dimensions" type="JSONB" nullable="false" />
+        <column name="metrics" type="JSONB" nullable="false" />
+        <column name="filters" type="JSONB" nullable="false" />
+        <column name="chart_type" type="&quot;DashboardWidgetChartType&quot;" nullable="false" />
+        <column name="chart_config" type="JSONB" nullable="false" />
+      </columns>
+      <constraints>
+        <primary-key name="dashboard_widgets_pkey" columns="id" />
+      </constraints>
+    </table>
+    <table name="table_view_presets">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="table_name" type="TEXT" nullable="false" />
+        <column name="created_by" type="TEXT" nullable="true" ref-table="users" ref-col="id" />
+        <column name="updated_by" type="TEXT" nullable="true" ref-table="users" ref-col="id" />
+        <column name="filters" type="JSONB" nullable="false" />
+        <column name="column_order" type="JSONB" nullable="false" />
+        <column name="column_visibility" type="JSONB" nullable="false" />
+        <column name="search_query" type="TEXT" nullable="true" />
+        <column name="order_by" type="JSONB" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="table_view_presets_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="table_view_presets_project_id_table_name_name_key" unique="true">
+          <column name="project_id" />
+          <column name="table_name" />
+          <column name="name" />
+        </index>
+      </indexes>
+    </table>
+  </tables>
+</database>

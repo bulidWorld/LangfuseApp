@@ -1,0 +1,14 @@
+[
+  {
+    "name": "langfuse-worker",
+    "path": "KunPeng/lgfuse-app",
+    "Dockerfile": "./worker/Dockerfile",
+    "context": "."
+  },
+  {
+    "name": "langfuse-web",
+    "path": "KunPeng/lgfuse-app",
+    "Dockerfile": "./web/Dockerfile",
+    "context": "."
+  }
+]

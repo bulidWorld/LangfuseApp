@@ -1,0 +1,264 @@
+<?xml version='1.0' encoding='utf-8'?>
+<database xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="langfuse" source="packages/shared/prisma/schema.prisma" dialect="postgresql" xsi:noNamespaceSchemaLocation="database.xsd">
+  <tables>
+    <table name="Account">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="user_id" type="TEXT" nullable="false" ref-table="users" ref-col="id" />
+        <column name="type" type="TEXT" nullable="false" />
+        <column name="provider" type="TEXT" nullable="false" />
+        <column name="providerAccountId" type="TEXT" nullable="false" />
+        <column name="refresh_token" type="TEXT" nullable="true" />
+        <column name="access_token" type="TEXT" nullable="true" />
+        <column name="expires_at" type="INTEGER" nullable="true" />
+        <column name="expires_in" type="INTEGER" nullable="true" />
+        <column name="ext_expires_in" type="INTEGER" nullable="true" />
+        <column name="token_type" type="TEXT" nullable="true" />
+        <column name="scope" type="TEXT" nullable="true" />
+        <column name="id_token" type="TEXT" nullable="true" />
+        <column name="session_state" type="TEXT" nullable="true" />
+        <column name="refresh_token_expires_in" type="INTEGER" nullable="true" />
+        <column name="created_at" type="INTEGER" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="Account_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="Account_user_id_idx" unique="false">
+          <column name="user_id" />
+        </index>
+        <index name="Account_provider_providerAccountId_key" unique="true">
+          <column name="provider" />
+          <column name="providerAccountId" />
+        </index>
+      </indexes>
+    </table>
+    <table name="Session">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="session_token" type="TEXT" nullable="false" />
+        <column name="user_id" type="TEXT" nullable="false" ref-table="users" ref-col="id" />
+        <column name="expires" type="TIMESTAMP(3)" nullable="false" />
+      </columns>
+      <constraints>
+        <primary-key name="Session_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="Session_session_token_key" unique="true">
+          <column name="session_token" />
+        </index>
+      </indexes>
+    </table>
+    <table name="users">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="name" type="TEXT" nullable="true" />
+        <column name="email" type="TEXT" nullable="true" />
+        <column name="email_verified" type="TIMESTAMP(3)" nullable="true" />
+        <column name="password" type="TEXT" nullable="true" />
+        <column name="image" type="TEXT" nullable="true" />
+        <column name="admin" type="BOOLEAN NOT NULL" nullable="true" default="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="feature_flags" type="TEXT[]" nullable="true" default="ARRAY[]::TEXT[]" />
+      </columns>
+      <constraints>
+        <primary-key name="users_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="users_email_key" unique="true">
+          <column name="email" />
+        </index>
+      </indexes>
+    </table>
+    <table name="verification_tokens">
+      <columns>
+        <column name="identifier" type="TEXT" nullable="false" />
+        <column name="token" type="TEXT" nullable="false" />
+        <column name="expires" type="TIMESTAMP(3)" nullable="false" />
+      </columns>
+      <indexes>
+        <index name="verification_tokens_token_key" unique="true">
+          <column name="token" />
+        </index>
+        <index name="verification_tokens_identifier_token_key" unique="true">
+          <column name="identifier" />
+          <column name="token" />
+        </index>
+      </indexes>
+    </table>
+    <table name="organizations">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="cloud_config" type="JSONB" nullable="true" />
+        <column name="metadata" type="JSONB" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="organizations_pkey" columns="id" />
+      </constraints>
+    </table>
+    <table name="projects">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="org_id" type="TEXT" nullable="false" ref-table="organizations" ref-col="id" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="deleted_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="retention_days" type="INTEGER" nullable="true" />
+        <column name="metadata" type="JSONB" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="projects_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="projects_org_id_idx" unique="false">
+          <column name="org_id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="api_keys">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="note" type="TEXT" nullable="true" />
+        <column name="public_key" type="TEXT" nullable="false" />
+        <column name="hashed_secret_key" type="TEXT" nullable="false" />
+        <column name="fast_hashed_secret_key" type="TEXT" nullable="true" />
+        <column name="display_secret_key" type="TEXT" nullable="false" />
+        <column name="last_used_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="expires_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="project_id" type="TEXT" nullable="true" ref-table="projects" ref-col="id" />
+        <column name="organization_id" type="TEXT" nullable="true" ref-table="organizations" ref-col="id" />
+        <column name="scope" type="&quot;ApiKeyScope&quot; NOT NULL" nullable="true" default="'PROJECT'" />
+      </columns>
+      <constraints>
+        <primary-key name="api_keys_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="api_keys_id_key" unique="true">
+          <column name="id" />
+        </index>
+        <index name="api_keys_public_key_key" unique="true">
+          <column name="public_key" />
+        </index>
+        <index name="api_keys_hashed_secret_key_key" unique="true">
+          <column name="hashed_secret_key" />
+        </index>
+        <index name="api_keys_fast_hashed_secret_key_key" unique="true">
+          <column name="fast_hashed_secret_key" />
+        </index>
+        <index name="api_keys_organization_id_idx" unique="false">
+          <column name="organization_id" />
+        </index>
+        <index name="api_keys_project_id_idx" unique="false">
+          <column name="project_id" />
+        </index>
+        <index name="api_keys_public_key_idx" unique="false">
+          <column name="public_key" />
+        </index>
+        <index name="api_keys_hashed_secret_key_idx" unique="false">
+          <column name="hashed_secret_key" />
+        </index>
+        <index name="api_keys_fast_hashed_secret_key_idx" unique="false">
+          <column name="fast_hashed_secret_key" />
+        </index>
+      </indexes>
+    </table>
+    <table name="organization_memberships">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="org_id" type="TEXT" nullable="false" ref-table="organizations" ref-col="id" />
+        <column name="user_id" type="TEXT" nullable="false" ref-table="users" ref-col="id" />
+        <column name="role" type="&quot;Role&quot;" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+      </columns>
+      <constraints>
+        <primary-key name="organization_memberships_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="organization_memberships_user_id_idx" unique="false">
+          <column name="user_id" />
+        </index>
+        <index name="organization_memberships_org_id_user_id_key" unique="true">
+          <column name="org_id" />
+          <column name="user_id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="project_memberships">
+      <columns>
+        <column name="org_membership_id" type="TEXT" nullable="false" ref-table="organization_memberships" ref-col="id" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="user_id" type="TEXT" nullable="false" ref-table="users" ref-col="id" />
+        <column name="role" type="&quot;Role&quot;" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+      </columns>
+      <constraints>
+        <primary-key name="project_memberships_pkey" columns="project_id, user_id" />
+      </constraints>
+      <indexes>
+        <index name="project_memberships_user_id_idx" unique="false">
+          <column name="user_id" />
+        </index>
+        <index name="project_memberships_project_id_idx" unique="false">
+          <column name="project_id" />
+        </index>
+        <index name="project_memberships_org_membership_id_idx" unique="false">
+          <column name="org_membership_id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="membership_invitations">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="email" type="TEXT" nullable="false" />
+        <column name="org_id" type="TEXT" nullable="false" ref-table="organizations" ref-col="id" />
+        <column name="org_role" type="&quot;Role&quot;" nullable="false" />
+        <column name="project_id" type="TEXT" nullable="true" ref-table="projects" ref-col="id" />
+        <column name="project_role" type="&quot;Role&quot;" nullable="true" />
+        <column name="invited_by_user_id" type="TEXT" nullable="true" ref-table="users" ref-col="id" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+      </columns>
+      <constraints>
+        <primary-key name="membership_invitations_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="membership_invitations_id_key" unique="true">
+          <column name="id" />
+        </index>
+        <index name="membership_invitations_project_id_idx" unique="false">
+          <column name="project_id" />
+        </index>
+        <index name="membership_invitations_org_id_idx" unique="false">
+          <column name="org_id" />
+        </index>
+        <index name="membership_invitations_email_idx" unique="false">
+          <column name="email" />
+        </index>
+        <index name="membership_invitations_email_org_id_key" unique="true">
+          <column name="email" />
+          <column name="org_id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="sso_configs">
+      <columns>
+        <column name="domain" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="auth_provider" type="TEXT" nullable="false" />
+        <column name="auth_config" type="JSONB" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="sso_configs_pkey" columns="domain" />
+      </constraints>
+    </table>
+  </tables>
+</database>

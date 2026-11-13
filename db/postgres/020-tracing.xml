@@ -1,0 +1,380 @@
+<?xml version='1.0' encoding='utf-8'?>
+<database xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="langfuse" source="packages/shared/prisma/schema.prisma" dialect="postgresql" xsi:noNamespaceSchemaLocation="database.xsd">
+  <tables>
+    <table name="trace_sessions">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="bookmarked" type="BOOLEAN NOT NULL" nullable="true" default="false" />
+        <column name="public" type="BOOLEAN NOT NULL" nullable="true" default="false" />
+        <column name="environment" type="TEXT NOT NULL" nullable="true" default="'default'" />
+      </columns>
+      <constraints>
+        <primary-key name="trace_sessions_pkey" columns="id, project_id" />
+      </constraints>
+      <indexes>
+        <index name="trace_sessions_project_id_created_at_idx" unique="false">
+          <column name="project_id" />
+          <column name="created_at" order="DESC" />
+        </index>
+      </indexes>
+    </table>
+    <table name="traces">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="external_id" type="TEXT" nullable="true" />
+        <column name="timestamp" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="name" type="TEXT" nullable="true" />
+        <column name="user_id" type="TEXT" nullable="true" />
+        <column name="metadata" type="JSONB" nullable="true" />
+        <column name="release" type="TEXT" nullable="true" />
+        <column name="version" type="TEXT" nullable="true" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="public" type="BOOLEAN NOT NULL" nullable="true" default="false" />
+        <column name="bookmarked" type="BOOLEAN NOT NULL" nullable="true" default="false" />
+        <column name="tags" type="TEXT[]" nullable="true" default="ARRAY[]::TEXT[]" />
+        <column name="input" type="JSONB" nullable="true" />
+        <column name="output" type="JSONB" nullable="true" />
+        <column name="session_id" type="TEXT" nullable="true" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+      </columns>
+      <constraints>
+        <primary-key name="traces_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="traces_project_id_timestamp_idx" unique="false">
+          <column name="project_id" />
+          <column name="timestamp" />
+        </index>
+        <index name="traces_session_id_idx" unique="false">
+          <column name="session_id" />
+        </index>
+        <index name="traces_name_idx" unique="false">
+          <column name="name" />
+        </index>
+        <index name="traces_user_id_idx" unique="false">
+          <column name="user_id" />
+        </index>
+        <index name="traces_id_user_id_idx" unique="false">
+          <column name="id" />
+          <column name="user_id" />
+        </index>
+        <index name="traces_timestamp_idx" unique="false">
+          <column name="timestamp" />
+        </index>
+        <index name="traces_created_at_idx" unique="false">
+          <column name="created_at" />
+        </index>
+      </indexes>
+    </table>
+    <table name="observations">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="trace_id" type="TEXT" nullable="true" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="type" type="&quot;ObservationType&quot;" nullable="false" />
+        <column name="start_time" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="end_time" type="TIMESTAMP(3)" nullable="true" />
+        <column name="name" type="TEXT" nullable="true" />
+        <column name="metadata" type="JSONB" nullable="true" />
+        <column name="parent_observation_id" type="TEXT" nullable="true" />
+        <column name="level" type="&quot;ObservationLevel&quot; NOT NULL" nullable="true" default="'DEFAULT'" />
+        <column name="status_message" type="TEXT" nullable="true" />
+        <column name="version" type="TEXT" nullable="true" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="model" type="TEXT" nullable="true" />
+        <column name="internal_model" type="TEXT" nullable="true" />
+        <column name="internal_model_id" type="TEXT" nullable="true" />
+        <column name="modelParameters" type="JSONB" nullable="true" />
+        <column name="input" type="JSONB" nullable="true" />
+        <column name="output" type="JSONB" nullable="true" />
+        <column name="prompt_tokens" type="INTEGER NOT NULL" nullable="true" default="0" />
+        <column name="completion_tokens" type="INTEGER NOT NULL" nullable="true" default="0" />
+        <column name="total_tokens" type="INTEGER NOT NULL" nullable="true" default="0" />
+        <column name="unit" type="TEXT" nullable="true" />
+        <column name="input_cost" type="DECIMAL(65,30)" nullable="true" />
+        <column name="output_cost" type="DECIMAL(65,30)" nullable="true" />
+        <column name="total_cost" type="DECIMAL(65,30)" nullable="true" />
+        <column name="calculated_input_cost" type="DECIMAL(65,30)" nullable="true" />
+        <column name="calculated_output_cost" type="DECIMAL(65,30)" nullable="true" />
+        <column name="calculated_total_cost" type="DECIMAL(65,30)" nullable="true" />
+        <column name="completion_start_time" type="TIMESTAMP(3)" nullable="true" />
+        <column name="prompt_id" type="TEXT" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="observations_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="observations_project_id_internal_model_start_time_unit_idx" unique="false">
+          <column name="project_id" />
+          <column name="internal_model" />
+          <column name="start_time" />
+          <column name="unit" />
+        </index>
+        <index name="observations_trace_id_project_id_type_start_time_idx" unique="false">
+          <column name="trace_id" />
+          <column name="project_id" />
+          <column name="type" />
+          <column name="start_time" />
+        </index>
+        <index name="observations_trace_id_project_id_start_time_idx" unique="false">
+          <column name="trace_id" />
+          <column name="project_id" />
+          <column name="start_time" />
+        </index>
+        <index name="observations_type_idx" unique="false">
+          <column name="type" />
+        </index>
+        <index name="observations_start_time_idx" unique="false">
+          <column name="start_time" />
+        </index>
+        <index name="observations_created_at_idx" unique="false">
+          <column name="created_at" />
+        </index>
+        <index name="observations_model_idx" unique="false">
+          <column name="model" />
+        </index>
+        <index name="observations_internal_model_idx" unique="false">
+          <column name="internal_model" />
+        </index>
+        <index name="observations_project_id_prompt_id_idx" unique="false">
+          <column name="project_id" />
+          <column name="prompt_id" />
+        </index>
+        <index name="observations_prompt_id_idx" unique="false">
+          <column name="prompt_id" />
+        </index>
+        <index name="observations_project_id_start_time_type_idx" unique="false">
+          <column name="project_id" />
+          <column name="start_time" />
+          <column name="type" />
+        </index>
+        <index name="observations_id_project_id_key" unique="true">
+          <column name="id" />
+          <column name="project_id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="scores">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="timestamp" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="value" type="DOUBLE PRECISION" nullable="true" />
+        <column name="source" type="&quot;ScoreSource&quot;" nullable="false" />
+        <column name="author_user_id" type="TEXT" nullable="true" />
+        <column name="comment" type="TEXT" nullable="true" />
+        <column name="trace_id" type="TEXT" nullable="false" />
+        <column name="observation_id" type="TEXT" nullable="true" />
+        <column name="config_id" type="TEXT" nullable="true" ref-table="score_configs" ref-col="id" />
+        <column name="string_value" type="TEXT" nullable="true" />
+        <column name="queue_id" type="TEXT" nullable="true" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="data_type" type="&quot;ScoreDataType&quot; NOT NULL" nullable="true" default="'NUMERIC'" />
+      </columns>
+      <constraints>
+        <primary-key name="scores_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="scores_timestamp_idx" unique="false">
+          <column name="timestamp" />
+        </index>
+        <index name="scores_value_idx" unique="false">
+          <column name="value" />
+        </index>
+        <index name="scores_project_id_name_idx" unique="false">
+          <column name="project_id" />
+          <column name="name" />
+        </index>
+        <index name="scores_author_user_id_idx" unique="false">
+          <column name="author_user_id" />
+        </index>
+        <index name="scores_config_id_idx" unique="false">
+          <column name="config_id" />
+        </index>
+        <index name="scores_trace_id_idx" unique="false" method="hash">
+          <column name="trace_id" />
+        </index>
+        <index name="scores_observation_id_idx" unique="false" method="hash">
+          <column name="observation_id" />
+        </index>
+        <index name="scores_source_idx" unique="false">
+          <column name="source" />
+        </index>
+        <index name="scores_created_at_idx" unique="false">
+          <column name="created_at" />
+        </index>
+        <index name="scores_id_project_id_key" unique="true">
+          <column name="id" />
+          <column name="project_id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="score_configs">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="data_type" type="&quot;ScoreDataType&quot;" nullable="false" />
+        <column name="is_archived" type="BOOLEAN NOT NULL" nullable="true" default="false" />
+        <column name="min_value" type="DOUBLE PRECISION" nullable="true" />
+        <column name="max_value" type="DOUBLE PRECISION" nullable="true" />
+        <column name="categories" type="JSONB" nullable="true" />
+        <column name="description" type="TEXT" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="score_configs_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="score_configs_data_type_idx" unique="false">
+          <column name="data_type" />
+        </index>
+        <index name="score_configs_is_archived_idx" unique="false">
+          <column name="is_archived" />
+        </index>
+        <index name="score_configs_project_id_idx" unique="false">
+          <column name="project_id" />
+        </index>
+        <index name="score_configs_categories_idx" unique="false">
+          <column name="categories" />
+        </index>
+        <index name="score_configs_created_at_idx" unique="false">
+          <column name="created_at" />
+        </index>
+        <index name="score_configs_updated_at_idx" unique="false">
+          <column name="updated_at" />
+        </index>
+        <index name="score_configs_id_project_id_key" unique="true">
+          <column name="id" />
+          <column name="project_id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="annotation_queues">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="description" type="TEXT" nullable="true" />
+        <column name="score_config_ids" type="TEXT[]" nullable="true" default="ARRAY[]::TEXT[]" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+      </columns>
+      <constraints>
+        <primary-key name="annotation_queues_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="annotation_queues_id_project_id_idx" unique="false">
+          <column name="id" />
+          <column name="project_id" />
+        </index>
+        <index name="annotation_queues_project_id_created_at_idx" unique="false">
+          <column name="project_id" />
+          <column name="created_at" />
+        </index>
+        <index name="annotation_queues_project_id_name_key" unique="true">
+          <column name="project_id" />
+          <column name="name" />
+        </index>
+      </indexes>
+    </table>
+    <table name="annotation_queue_items">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="queue_id" type="TEXT" nullable="false" ref-table="annotation_queues" ref-col="id" />
+        <column name="object_id" type="TEXT" nullable="false" />
+        <column name="object_type" type="&quot;AnnotationQueueObjectType&quot;" nullable="false" />
+        <column name="status" type="&quot;AnnotationQueueStatus&quot; NOT NULL" nullable="true" default="'PENDING'" />
+        <column name="locked_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="locked_by_user_id" type="TEXT" nullable="true" ref-table="users" ref-col="id" />
+        <column name="annotator_user_id" type="TEXT" nullable="true" ref-table="users" ref-col="id" />
+        <column name="completed_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+      </columns>
+      <constraints>
+        <primary-key name="annotation_queue_items_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="annotation_queue_items_id_project_id_idx" unique="false">
+          <column name="id" />
+          <column name="project_id" />
+        </index>
+        <index name="annotation_queue_items_project_id_queue_id_status_idx" unique="false">
+          <column name="project_id" />
+          <column name="queue_id" />
+          <column name="status" />
+        </index>
+        <index name="annotation_queue_items_object_id_object_type_project_id_que_idx" unique="false">
+          <column name="object_id" />
+          <column name="object_type" />
+          <column name="project_id" />
+          <column name="queue_id" />
+        </index>
+        <index name="annotation_queue_items_annotator_user_id_idx" unique="false">
+          <column name="annotator_user_id" />
+        </index>
+        <index name="annotation_queue_items_created_at_idx" unique="false">
+          <column name="created_at" />
+        </index>
+      </indexes>
+    </table>
+    <table name="annotation_queue_assignments">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="user_id" type="TEXT" nullable="false" ref-table="users" ref-col="id" />
+        <column name="queue_id" type="TEXT" nullable="false" ref-table="annotation_queues" ref-col="id" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+      </columns>
+      <constraints>
+        <primary-key name="annotation_queue_assignments_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="annotation_queue_assignments_project_id_queue_id_user_id_key" unique="true">
+          <column name="project_id" />
+          <column name="queue_id" />
+          <column name="user_id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="comments">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="object_type" type="&quot;CommentObjectType&quot;" nullable="false" />
+        <column name="object_id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="content" type="TEXT" nullable="false" />
+        <column name="author_user_id" type="TEXT" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="comments_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="comments_project_id_object_type_object_id_idx" unique="false">
+          <column name="project_id" />
+          <column name="object_type" />
+          <column name="object_id" />
+        </index>
+      </indexes>
+    </table>
+  </tables>
+  <statements>
+    <statement id="index-traces_tags_idx">
+      <description>Index operator class is specified by the source Prisma schema.</description>
+      <sql>CREATE INDEX IF NOT EXISTS "traces_tags_idx" ON "traces" USING GIN ("tags" array_ops)</sql>
+    </statement>
+  </statements>
+</database>

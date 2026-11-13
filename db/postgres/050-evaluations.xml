@@ -1,0 +1,142 @@
+<?xml version='1.0' encoding='utf-8'?>
+<database xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="langfuse" source="packages/shared/prisma/schema.prisma" dialect="postgresql" xsi:noNamespaceSchemaLocation="database.xsd">
+  <tables>
+    <table name="background_migrations">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="script" type="TEXT" nullable="false" />
+        <column name="args" type="JSONB" nullable="false" />
+        <column name="state" type="JSONB NOT NULL" nullable="true" default="'{}'" />
+        <column name="finished_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="failed_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="failed_reason" type="TEXT" nullable="true" />
+        <column name="worker_id" type="TEXT" nullable="true" />
+        <column name="locked_at" type="TIMESTAMP(3)" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="background_migrations_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="background_migrations_name_key" unique="true">
+          <column name="name" />
+        </index>
+      </indexes>
+    </table>
+    <table name="cron_jobs">
+      <columns>
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="last_run" type="TIMESTAMP(3)" nullable="true" />
+        <column name="job_started_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="state" type="TEXT" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="cron_jobs_pkey" columns="name" />
+      </constraints>
+    </table>
+    <table name="eval_templates">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="project_id" type="TEXT" nullable="true" ref-table="projects" ref-col="id" />
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="version" type="INTEGER" nullable="false" />
+        <column name="prompt" type="TEXT" nullable="false" />
+        <column name="partner" type="TEXT" nullable="true" />
+        <column name="model" type="TEXT" nullable="true" />
+        <column name="provider" type="TEXT" nullable="true" />
+        <column name="model_params" type="JSONB" nullable="true" />
+        <column name="vars" type="TEXT[]" nullable="true" default="ARRAY[]::TEXT[]" />
+        <column name="output_schema" type="JSONB" nullable="false" />
+      </columns>
+      <constraints>
+        <primary-key name="eval_templates_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="eval_templates_project_id_id_idx" unique="false">
+          <column name="project_id" />
+          <column name="id" />
+        </index>
+        <index name="eval_templates_project_id_name_version_key" unique="true">
+          <column name="project_id" />
+          <column name="name" />
+          <column name="version" />
+        </index>
+      </indexes>
+    </table>
+    <table name="job_configurations">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="job_type" type="&quot;JobType&quot;" nullable="false" />
+        <column name="status" type="&quot;JobConfigState&quot; NOT NULL" nullable="true" default="'ACTIVE'" />
+        <column name="eval_template_id" type="TEXT" nullable="true" ref-table="eval_templates" ref-col="id" />
+        <column name="score_name" type="TEXT" nullable="false" />
+        <column name="filter" type="JSONB" nullable="false" />
+        <column name="target_object" type="TEXT" nullable="false" />
+        <column name="variable_mapping" type="JSONB" nullable="false" />
+        <column name="sampling" type="DECIMAL(65,30)" nullable="false" />
+        <column name="delay" type="INTEGER" nullable="false" />
+        <column name="time_scope" type="TEXT[]" nullable="true" default="ARRAY['NEW']::TEXT[]" />
+      </columns>
+      <constraints>
+        <primary-key name="job_configurations_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="job_configurations_project_id_id_idx" unique="false">
+          <column name="project_id" />
+          <column name="id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="job_executions">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="job_configuration_id" type="TEXT" nullable="false" ref-table="job_configurations" ref-col="id" />
+        <column name="job_template_id" type="TEXT" nullable="true" ref-table="eval_templates" ref-col="id" />
+        <column name="status" type="&quot;JobExecutionStatus&quot;" nullable="false" />
+        <column name="start_time" type="TIMESTAMP(3)" nullable="true" />
+        <column name="end_time" type="TIMESTAMP(3)" nullable="true" />
+        <column name="error" type="TEXT" nullable="true" />
+        <column name="job_input_trace_id" type="TEXT" nullable="true" />
+        <column name="job_input_observation_id" type="TEXT" nullable="true" />
+        <column name="job_input_dataset_item_id" type="TEXT" nullable="true" />
+        <column name="job_output_score_id" type="TEXT" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="job_executions_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="job_executions_project_id_status_idx" unique="false">
+          <column name="project_id" />
+          <column name="status" />
+        </index>
+        <index name="job_executions_project_id_id_idx" unique="false">
+          <column name="project_id" />
+          <column name="id" />
+        </index>
+        <index name="job_executions_job_configuration_id_idx" unique="false">
+          <column name="job_configuration_id" />
+        </index>
+        <index name="job_executions_job_output_score_id_idx" unique="false">
+          <column name="job_output_score_id" />
+        </index>
+        <index name="job_executions_job_input_trace_id_idx" unique="false">
+          <column name="job_input_trace_id" />
+        </index>
+        <index name="job_executions_created_at_idx" unique="false">
+          <column name="created_at" />
+        </index>
+        <index name="job_executions_updated_at_idx" unique="false">
+          <column name="updated_at" />
+        </index>
+      </indexes>
+    </table>
+  </tables>
+</database>

@@ -1,0 +1,545 @@
+<?xml version='1.0' encoding='utf-8'?>
+<database name="langfuse" source="packages/shared/clickhouse/migrations/{clustered,unclustered}/*.up.sql" dialect="clickhouse">
+  <tables>
+    <table name="traces_null" on-cluster="default" comment="Trace 聚合物化视图的 Null 引擎输入表；接收变更记录并触发下游聚合，不持久保存行数据。">
+      <columns>
+        <column name="project_id" type="String" comment="Langfuse 项目标识，用于隔离和筛选项目数据。" />
+        <column name="id" type="String" comment="Trace 标识；由写入的 trace、observation 或 score 事件归并得到。" />
+        <column name="start_time" type="DateTime64(3)" comment="当前输入事件对应的 trace 起始时间。" />
+        <column name="end_time" type="Nullable(DateTime64(3))" comment="当前输入事件对应的 trace 结束时间。" />
+        <column name="name" type="Nullable(String)" comment="Trace 名称；本输入表中通常为空，由其他数据源补充。" />
+        <column name="metadata" type="Map(LowCardinality(String), String)" comment="当前输入事件携带的 trace 元数据。" />
+        <column name="user_id" type="Nullable(String)" comment="当前输入事件携带的用户标识。" />
+        <column name="session_id" type="Nullable(String)" comment="当前输入事件携带的会话标识。" />
+        <column name="environment" type="String" comment="当前输入事件所属环境。" />
+        <column name="tags" type="Array(String)" comment="当前输入事件携带的 trace 标签。" />
+        <column name="version" type="Nullable(String)" comment="当前输入事件携带的应用版本。" />
+        <column name="release" type="Nullable(String)" comment="当前输入事件携带的应用发布版本。" />
+        <column name="bookmarked" type="Nullable(Bool)" comment="当前输入事件携带的收藏状态；空值表示不覆盖已有值。" />
+        <column name="public" type="Nullable(Bool)" comment="当前输入事件携带的公开状态；空值表示不覆盖已有值。" />
+        <column name="observation_ids" type="Array(String)" comment="当前事件带来的 observation 标识，供聚合表去重合并。" />
+        <column name="score_ids" type="Array(String)" comment="当前事件带来的 score 标识，供聚合表去重合并。" />
+        <column name="cost_details" type="Map(String, Decimal64(12))" comment="当前事件带来的费用增量映射。" />
+        <column name="usage_details" type="Map(String, UInt64)" comment="当前事件带来的用量增量映射。" />
+        <column name="input" type="String" comment="当前事件携带的非空输入内容；空字符串不会覆盖聚合结果。" />
+        <column name="output" type="String" comment="当前事件携带的非空输出内容；空字符串不会覆盖聚合结果。" />
+        <column name="created_at" type="DateTime64(3)" comment="该记录首次创建时间。" />
+        <column name="updated_at" type="DateTime64(3)" comment="该记录最近一次业务更新时间。" />
+        <column name="event_ts" type="DateTime64(3)" comment="记录变更版本时间，用于 ReplacingMergeTree 选择较新的版本。" />
+      </columns>
+      <engine>
+        <Cluster type="Null()" />
+        <UnCluster type="Null()" />
+      </engine>
+    </table>
+    <table name="traces_all_amt" on-cluster="default" comment="全保留期的 Trace 聚合表，保存按 trace 合并后的最新属性和累计关联数据。">
+      <columns>
+        <column name="project_id" type="String" comment="Langfuse 项目标识，用于隔离和筛选项目数据。" />
+        <column name="id" type="String" comment="记录标识；具体表示的实体由所在表决定。" />
+        <column name="timestamp" type="SimpleAggregateFunction(min, DateTime64(3))" comment="Trace 的最早业务时间；为兼容旧查询与 start_time 保持一致。" />
+        <column name="start_time" type="SimpleAggregateFunction(min, DateTime64(3))" comment="聚合后的最早 trace 起始时间。" />
+        <column name="end_time" type="SimpleAggregateFunction(max, Nullable(DateTime64(3)))" comment="聚合后的最晚 trace 结束时间。" />
+        <column name="name" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新 Trace 名称。" />
+        <column name="metadata" type="SimpleAggregateFunction(maxMap, Map(String, String))" comment="通过 maxMap 合并得到的 Trace 元数据映射。" />
+        <column name="user_id" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新用户标识。" />
+        <column name="session_id" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新会话标识。" />
+        <column name="environment" type="SimpleAggregateFunction(anyLast, String)" comment="按 event_ts 合并得到的最新环境名称。" />
+        <column name="tags" type="SimpleAggregateFunction(groupUniqArrayArray, Array(String))" comment="Trace 标签的去重集合。" />
+        <column name="version" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新应用版本。" />
+        <column name="release" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新应用发布版本。" />
+        <column name="bookmarked" type="AggregateFunction(argMax, Nullable(Bool), DateTime64(3))" comment="按 event_ts 聚合保存的最新收藏状态。" />
+        <column name="public" type="AggregateFunction(argMax, Nullable(Bool), DateTime64(3))" comment="按 event_ts 聚合保存的最新公开状态。" />
+        <column name="observation_ids" type="SimpleAggregateFunction(groupUniqArrayArray, Array(String))" comment="归属于该 trace 的 observation 标识去重集合。" />
+        <column name="score_ids" type="SimpleAggregateFunction(groupUniqArrayArray, Array(String))" comment="归属于该 trace 的 score 标识去重集合。" />
+        <column name="cost_details" type="SimpleAggregateFunction(sumMap, Map(String, Decimal(38, 12)))" comment="通过 sumMap 累加的费用明细映射。" />
+        <column name="usage_details" type="SimpleAggregateFunction(sumMap, Map(String, UInt64))" comment="通过 sumMap 累加的用量明细映射。" />
+        <column name="input" type="AggregateFunction(argMax, String, DateTime64(3))" codec="(ZSTD(3))" comment="按 event_ts 保存的最新非空输入内容聚合状态。" />
+        <column name="output" type="AggregateFunction(argMax, String, DateTime64(3))" codec="(ZSTD(3))" comment="按 event_ts 保存的最新非空输出内容聚合状态。" />
+        <column name="created_at" type="SimpleAggregateFunction(min, DateTime64(3))" comment="参与聚合的记录中最早的创建时间。" />
+        <column name="updated_at" type="SimpleAggregateFunction(max, DateTime64(3))" comment="参与聚合的记录中最晚的更新时间。" />
+      </columns>
+      <indexes>
+        <index name="idx_trace_id" expression="id" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_user_id" expression="user_id" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_session_id" expression="session_id" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_name" expression="name" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_version" expression="version" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_release" expression="release" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_tags" expression="tags" type="bloom_filter(0.001)" granularity="1" />
+      </indexes>
+      <engine>
+        <Cluster type="AggregatingMergeTree()" />
+        <UnCluster type="AggregatingMergeTree()" />
+      </engine>
+      <order-by>(project_id, id)</order-by>
+    </table>
+    <table name="traces_7d_amt" on-cluster="default" comment="短期 Trace 聚合表，保存按 trace 合并的数据并按 start_time 保留 7 天。">
+      <columns>
+        <column name="project_id" type="String" comment="Langfuse 项目标识，用于隔离和筛选项目数据。" />
+        <column name="id" type="String" comment="记录标识；具体表示的实体由所在表决定。" />
+        <column name="timestamp" type="SimpleAggregateFunction(min, DateTime64(3))" comment="Trace 的最早业务时间；为兼容旧查询与 start_time 保持一致。" />
+        <column name="start_time" type="SimpleAggregateFunction(min, DateTime64(3))" comment="聚合后的最早 trace 起始时间。" />
+        <column name="end_time" type="SimpleAggregateFunction(max, Nullable(DateTime64(3)))" comment="聚合后的最晚 trace 结束时间。" />
+        <column name="name" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新 Trace 名称。" />
+        <column name="metadata" type="SimpleAggregateFunction(maxMap, Map(String, String))" comment="通过 maxMap 合并得到的 Trace 元数据映射。" />
+        <column name="user_id" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新用户标识。" />
+        <column name="session_id" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新会话标识。" />
+        <column name="environment" type="SimpleAggregateFunction(anyLast, String)" comment="按 event_ts 合并得到的最新环境名称。" />
+        <column name="tags" type="SimpleAggregateFunction(groupUniqArrayArray, Array(String))" comment="Trace 标签的去重集合。" />
+        <column name="version" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新应用版本。" />
+        <column name="release" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新应用发布版本。" />
+        <column name="bookmarked" type="AggregateFunction(argMax, Nullable(Bool), DateTime64(3))" comment="按 event_ts 聚合保存的最新收藏状态。" />
+        <column name="public" type="AggregateFunction(argMax, Nullable(Bool), DateTime64(3))" comment="按 event_ts 聚合保存的最新公开状态。" />
+        <column name="observation_ids" type="SimpleAggregateFunction(groupUniqArrayArray, Array(String))" comment="归属于该 trace 的 observation 标识去重集合。" />
+        <column name="score_ids" type="SimpleAggregateFunction(groupUniqArrayArray, Array(String))" comment="归属于该 trace 的 score 标识去重集合。" />
+        <column name="cost_details" type="SimpleAggregateFunction(sumMap, Map(String, Decimal(38, 12)))" comment="通过 sumMap 累加的费用明细映射。" />
+        <column name="usage_details" type="SimpleAggregateFunction(sumMap, Map(String, UInt64))" comment="通过 sumMap 累加的用量明细映射。" />
+        <column name="input" type="AggregateFunction(argMax, String, DateTime64(3))" codec="(ZSTD(3))" comment="按 event_ts 保存的最新非空输入内容聚合状态。" />
+        <column name="output" type="AggregateFunction(argMax, String, DateTime64(3))" codec="(ZSTD(3))" comment="按 event_ts 保存的最新非空输出内容聚合状态。" />
+        <column name="created_at" type="SimpleAggregateFunction(min, DateTime64(3))" comment="参与聚合的记录中最早的创建时间。" />
+        <column name="updated_at" type="SimpleAggregateFunction(max, DateTime64(3))" comment="参与聚合的记录中最晚的更新时间。" />
+      </columns>
+      <indexes>
+        <index name="idx_user_id" expression="user_id" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_session_id" expression="session_id" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_name" expression="name" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_version" expression="version" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_release" expression="release" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_tags" expression="tags" type="bloom_filter(0.001)" granularity="1" />
+      </indexes>
+      <engine>
+        <Cluster type="AggregatingMergeTree()" />
+        <UnCluster type="AggregatingMergeTree()" />
+      </engine>
+      <order-by>(project_id, id)</order-by>
+      <ttl>toDate(start_time) + INTERVAL 7 DAY</ttl>
+    </table>
+    <table name="traces_30d_amt" on-cluster="default" comment="中期 Trace 聚合表，保存按 trace 合并的数据并按 start_time 保留 30 天。">
+      <columns>
+        <column name="project_id" type="String" comment="Langfuse 项目标识，用于隔离和筛选项目数据。" />
+        <column name="id" type="String" comment="记录标识；具体表示的实体由所在表决定。" />
+        <column name="timestamp" type="SimpleAggregateFunction(min, DateTime64(3))" comment="Trace 的最早业务时间；为兼容旧查询与 start_time 保持一致。" />
+        <column name="start_time" type="SimpleAggregateFunction(min, DateTime64(3))" comment="聚合后的最早 trace 起始时间。" />
+        <column name="end_time" type="SimpleAggregateFunction(max, Nullable(DateTime64(3)))" comment="聚合后的最晚 trace 结束时间。" />
+        <column name="name" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新 Trace 名称。" />
+        <column name="metadata" type="SimpleAggregateFunction(maxMap, Map(String, String))" comment="通过 maxMap 合并得到的 Trace 元数据映射。" />
+        <column name="user_id" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新用户标识。" />
+        <column name="session_id" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新会话标识。" />
+        <column name="environment" type="SimpleAggregateFunction(anyLast, String)" comment="按 event_ts 合并得到的最新环境名称。" />
+        <column name="tags" type="SimpleAggregateFunction(groupUniqArrayArray, Array(String))" comment="Trace 标签的去重集合。" />
+        <column name="version" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新应用版本。" />
+        <column name="release" type="SimpleAggregateFunction(anyLast, Nullable(String))" comment="按 event_ts 合并得到的最新应用发布版本。" />
+        <column name="bookmarked" type="AggregateFunction(argMax, Nullable(Bool), DateTime64(3))" comment="按 event_ts 聚合保存的最新收藏状态。" />
+        <column name="public" type="AggregateFunction(argMax, Nullable(Bool), DateTime64(3))" comment="按 event_ts 聚合保存的最新公开状态。" />
+        <column name="observation_ids" type="SimpleAggregateFunction(groupUniqArrayArray, Array(String))" comment="归属于该 trace 的 observation 标识去重集合。" />
+        <column name="score_ids" type="SimpleAggregateFunction(groupUniqArrayArray, Array(String))" comment="归属于该 trace 的 score 标识去重集合。" />
+        <column name="cost_details" type="SimpleAggregateFunction(sumMap, Map(String, Decimal(38, 12)))" comment="通过 sumMap 累加的费用明细映射。" />
+        <column name="usage_details" type="SimpleAggregateFunction(sumMap, Map(String, UInt64))" comment="通过 sumMap 累加的用量明细映射。" />
+        <column name="input" type="AggregateFunction(argMax, String, DateTime64(3))" codec="(ZSTD(3))" comment="按 event_ts 保存的最新非空输入内容聚合状态。" />
+        <column name="output" type="AggregateFunction(argMax, String, DateTime64(3))" codec="(ZSTD(3))" comment="按 event_ts 保存的最新非空输出内容聚合状态。" />
+        <column name="created_at" type="SimpleAggregateFunction(min, DateTime64(3))" comment="参与聚合的记录中最早的创建时间。" />
+        <column name="updated_at" type="SimpleAggregateFunction(max, DateTime64(3))" comment="参与聚合的记录中最晚的更新时间。" />
+      </columns>
+      <indexes>
+        <index name="idx_user_id" expression="user_id" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_session_id" expression="session_id" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_name" expression="name" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_version" expression="version" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_release" expression="release" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_tags" expression="tags" type="bloom_filter(0.001)" granularity="1" />
+      </indexes>
+      <engine>
+        <Cluster type="AggregatingMergeTree()" />
+        <UnCluster type="AggregatingMergeTree()" />
+      </engine>
+      <order-by>(project_id, id)</order-by>
+      <ttl>toDate(start_time) + INTERVAL 30 DAY</ttl>
+    </table>
+  </tables>
+  <views>
+    <view name="project_environments_traces_mv" kind="MATERIALIZED" comment="source: clustered/0009_add_project_environments.up.sql" on-cluster="default" to="project_environments">
+      <query>SELECT
+    project_id,
+    groupUniqArray(environment) AS environments
+FROM traces
+GROUP BY project_id</query>
+    </view>
+    <view name="project_environments_observations_mv" kind="MATERIALIZED" comment="source: clustered/0009_add_project_environments.up.sql" on-cluster="default" to="project_environments">
+      <query>SELECT
+    project_id,
+    groupUniqArray(environment) AS environments
+FROM observations
+GROUP BY project_id</query>
+    </view>
+    <view name="project_environments_scores_mv" kind="MATERIALIZED" comment="source: clustered/0009_add_project_environments.up.sql" on-cluster="default" to="project_environments">
+      <query>SELECT
+    project_id,
+    groupUniqArray(environment) AS environments
+FROM scores
+GROUP BY project_id</query>
+    </view>
+    <view name="analytics_traces" kind="VIEW" comment="source: clustered/0019_analytics_traces.up.sql" on-cluster="default">
+      <query>SELECT
+    project_id,
+    toStartOfHour(timestamp) AS hour,
+    uniq(id) AS countTraces,
+    max(user_id IS NOT NULL) AS hasUsers,
+    max(session_id IS NOT NULL) AS hasSessions,
+    max(if(environment != 'default', 1, 0)) AS hasEnvironments,
+    max(length(tags) &gt; 0) AS hasTags
+FROM
+    traces
+WHERE toStartOfHour(timestamp) &lt;= toStartOfHour(subtractHours(now(), 1))
+GROUP BY
+    project_id,
+    hour</query>
+    </view>
+    <view name="analytics_observations" kind="VIEW" comment="source: clustered/0020_analytics_observations.up.sql" on-cluster="default">
+      <query>SELECT
+    project_id,
+    type,
+    toStartOfHour(start_time) AS hour,
+    uniq(id) AS countObservations,
+    max(level != 'DEFAULT') AS hasLevel,
+    max(provided_model_name IS NOT NULL) AS hasProvidedModelName,
+    max(length(provided_usage_details) &gt; 0) AS hasProvidedUsageDetails,
+    max(length(provided_cost_details) &gt; 0) AS hasProvidedCostDetails,
+    max(prompt_name IS NOT NULL) AS hasPromptName
+FROM
+    observations
+WHERE toStartOfHour(start_time) &lt;= toStartOfHour(subtractHours(now(), 1))
+GROUP BY
+    project_id,
+    type,
+    hour</query>
+    </view>
+    <view name="analytics_scores" kind="VIEW" comment="source: clustered/0021_analytics_scores.up.sql" on-cluster="default">
+      <query>SELECT
+    project_id,
+    toStartOfHour(timestamp) AS hour,
+    uniq(id) AS countScores,
+    max(source = 'ANNOTATION') AS hasAnnotation,
+    max(source = 'API') AS hasApi,
+    max(source = 'EVAL') AS hasEval,
+    max(observation_id IS NOT NULL) AS hasObservationScore,
+    max(session_id IS NOT NULL) AS hasSessionScore,
+    max(dataset_run_id IS NOT NULL) AS hasDatasetRunScore,
+    max(data_type = 'BOOLEAN') AS hasBoolScore,
+    max(data_type = 'NUMERIC') AS hasNumericScore,
+    max(data_type = 'CATEGORICAL') AS hasCategoricalScore,
+    max(comment IS NOT NULL) AS hasComment
+FROM
+    scores
+WHERE toStartOfHour(timestamp) &lt;= toStartOfHour(subtractHours(now(), 1))
+GROUP BY
+    project_id,
+    hour</query>
+    </view>
+    <view name="traces_all_amt_mv" kind="MATERIALIZED" comment="source: clustered/0023_traces_aggregating_merge_trees.up.sql" if-not-exists="true" on-cluster="default" to="traces_all_amt">
+      <query>SELECT
+    -- Identifiers
+    tn.project_id                                                                              as project_id,
+    tn.id                                                                                      as id,
+    min(tn.start_time)                                                                         as timestamp,  -- Backward compatibility: redundant with start_time
+    min(tn.start_time)                                                                         as start_time,
+    max(coalesce(tn.end_time, tn.start_time))                                                  as end_time,
+    anyLast(tn.name)                                                                           as name,
+
+    -- Metadata properties
+    maxMap(tn.metadata)                                                                        as metadata,
+    anyLast(tn.user_id)                                                                        as user_id,
+    anyLast(tn.session_id)                                                                     as session_id,
+    anyLast(tn.environment)                                                                    as environment,
+    groupUniqArrayArray(tn.tags)                                                               as tags,
+    anyLast(tn.version)                                                                        as version,
+    anyLast(tn.release)                                                                        as release,
+
+    -- UI properties
+    argMaxState(tn.bookmarked, if(tn.bookmarked is not null, tn.event_ts, toDateTime64(0, 3))) as bookmarked,
+    argMaxState(tn.public, if(tn.public is not null, tn.event_ts, toDateTime64(0, 3)))         as public,
+
+    -- Aggregations -- DO NOT USE
+    groupUniqArrayArray(tn.observation_ids)                                                    as observation_ids,
+    groupUniqArrayArray(tn.score_ids)                                                          as score_ids,
+    sumMap(tn.cost_details)                                                                    as cost_details,
+    sumMap(tn.usage_details)                                                                   as usage_details,
+
+    -- Input/Output
+    argMaxState(tn.input, if(tn.input &lt;&gt; '', tn.event_ts, toDateTime64(0, 3)))                 as input,
+    argMaxState(tn.output, if(tn.output &lt;&gt; '', tn.event_ts, toDateTime64(0, 3)))               as output,
+
+    min(tn.created_at)                                                                         as created_at,
+    max(tn.updated_at)                                                                         as updated_at
+FROM traces_null tn
+GROUP BY project_id, id</query>
+    </view>
+    <view name="traces_7d_amt_mv" kind="MATERIALIZED" comment="source: clustered/0023_traces_aggregating_merge_trees.up.sql" if-not-exists="true" on-cluster="default" to="traces_7d_amt">
+      <query>SELECT
+    -- Identifiers
+    tn.project_id                                                                              as project_id,
+    tn.id                                                                                      as id,
+    min(tn.start_time)                                                                         as timestamp,  -- Backward compatibility: redundant with start_time
+    min(tn.start_time)                                                                         as start_time,
+    max(coalesce(tn.end_time, tn.start_time))                                                  as end_time,
+    anyLast(tn.name)                                                                           as name,
+
+    -- Metadata properties
+    maxMap(tn.metadata)                                                                        as metadata,
+    anyLast(tn.user_id)                                                                        as user_id,
+    anyLast(tn.session_id)                                                                     as session_id,
+    anyLast(tn.environment)                                                                    as environment,
+    groupUniqArrayArray(tn.tags)                                                               as tags,
+    anyLast(tn.version)                                                                        as version,
+    anyLast(tn.release)                                                                        as release,
+
+    -- UI properties
+    argMaxState(tn.bookmarked, if(tn.bookmarked is not null, tn.event_ts, toDateTime64(0, 3))) as bookmarked,
+    argMaxState(tn.public, if(tn.public is not null, tn.event_ts, toDateTime64(0, 3)))         as public,
+
+    -- Aggregations -- DO NOT USE
+    groupUniqArrayArray(tn.observation_ids)                                                    as observation_ids,
+    groupUniqArrayArray(tn.score_ids)                                                          as score_ids,
+    sumMap(tn.cost_details)                                                                    as cost_details,
+    sumMap(tn.usage_details)                                                                   as usage_details,
+
+    -- Input/Output
+    argMaxState(tn.input, if(tn.input &lt;&gt; '', tn.event_ts, toDateTime64(0, 3)))                 as input,
+    argMaxState(tn.output, if(tn.output &lt;&gt; '', tn.event_ts, toDateTime64(0, 3)))               as output,
+
+    min(tn.created_at)                                                                         as created_at,
+    max(tn.updated_at)                                                                         as updated_at
+FROM traces_null tn
+GROUP BY project_id, id</query>
+    </view>
+    <view name="traces_30d_amt_mv" kind="MATERIALIZED" comment="source: clustered/0023_traces_aggregating_merge_trees.up.sql" if-not-exists="true" on-cluster="default" to="traces_30d_amt">
+      <query>SELECT
+    -- Identifiers
+    tn.project_id                                                                              as project_id,
+    tn.id                                                                                      as id,
+    min(tn.start_time)                                                                         as timestamp,  -- Backward compatibility: redundant with start_time
+    min(tn.start_time)                                                                         as start_time,
+    max(coalesce(tn.end_time, tn.start_time))                                                  as end_time,
+    anyLast(tn.name)                                                                           as name,
+
+    -- Metadata properties
+    maxMap(tn.metadata)                                                                        as metadata,
+    anyLast(tn.user_id)                                                                        as user_id,
+    anyLast(tn.session_id)                                                                     as session_id,
+    anyLast(tn.environment)                                                                    as environment,
+    groupUniqArrayArray(tn.tags)                                                               as tags,
+    anyLast(tn.version)                                                                        as version,
+    anyLast(tn.release)                                                                        as release,
+
+    -- UI properties
+    argMaxState(tn.bookmarked, if(tn.bookmarked is not null, tn.event_ts, toDateTime64(0, 3))) as bookmarked,
+    argMaxState(tn.public, if(tn.public is not null, tn.event_ts, toDateTime64(0, 3)))         as public,
+
+    -- Aggregations -- DO NOT USE
+    groupUniqArrayArray(tn.observation_ids)                                                    as observation_ids,
+    groupUniqArrayArray(tn.score_ids)                                                          as score_ids,
+    sumMap(tn.cost_details)                                                                    as cost_details,
+    sumMap(tn.usage_details)                                                                   as usage_details,
+
+    -- Input/Output
+    argMaxState(tn.input, if(tn.input &lt;&gt; '', tn.event_ts, toDateTime64(0, 3)))                 as input,
+    argMaxState(tn.output, if(tn.output &lt;&gt; '', tn.event_ts, toDateTime64(0, 3)))               as output,
+
+    min(tn.created_at)                                                                         as created_at,
+    max(tn.updated_at)                                                                         as updated_at
+FROM traces_null tn
+GROUP BY project_id, id</query>
+    </view>
+    <view name="project_environments_traces_mv" kind="MATERIALIZED" comment="source: unclustered/0009_add_project_environments.up.sql" to="project_environments">
+      <query>SELECT
+    project_id,
+    groupUniqArray(environment) AS environments
+FROM traces
+GROUP BY project_id</query>
+    </view>
+    <view name="project_environments_observations_mv" kind="MATERIALIZED" comment="source: unclustered/0009_add_project_environments.up.sql" to="project_environments">
+      <query>SELECT
+    project_id,
+    groupUniqArray(environment) AS environments
+FROM observations
+GROUP BY project_id</query>
+    </view>
+    <view name="project_environments_scores_mv" kind="MATERIALIZED" comment="source: unclustered/0009_add_project_environments.up.sql" to="project_environments">
+      <query>SELECT
+    project_id,
+    groupUniqArray(environment) AS environments
+FROM scores
+GROUP BY project_id</query>
+    </view>
+    <view name="analytics_traces" kind="VIEW" comment="source: unclustered/0019_analytics_traces.up.sql">
+      <query>SELECT
+    project_id,
+    toStartOfHour(timestamp) AS hour,
+    uniq(id) AS countTraces,
+    max(user_id IS NOT NULL) AS hasUsers,
+    max(session_id IS NOT NULL) AS hasSessions,
+    max(if(environment != 'default', 1, 0)) AS hasEnvironments,
+    max(length(tags) &gt; 0) AS hasTags
+FROM
+    traces
+WHERE toStartOfHour(timestamp) &lt;= toStartOfHour(subtractHours(now(), 1))
+GROUP BY
+    project_id,
+    hour</query>
+    </view>
+    <view name="analytics_observations" kind="VIEW" comment="source: unclustered/0020_analytics_observations.up.sql">
+      <query>SELECT
+    project_id,
+    type,
+    toStartOfHour(start_time) AS hour,
+    uniq(id) AS countObservations,
+    max(level != 'DEFAULT') AS hasLevel,
+    max(provided_model_name IS NOT NULL) AS hasProvidedModelName,
+    max(length(provided_usage_details) &gt; 0) AS hasProvidedUsageDetails,
+    max(length(provided_cost_details) &gt; 0) AS hasProvidedCostDetails,
+    max(prompt_name IS NOT NULL) AS hasPromptName
+FROM
+    observations
+WHERE toStartOfHour(start_time) &lt;= toStartOfHour(subtractHours(now(), 1))
+GROUP BY
+    project_id,
+    type,
+    hour</query>
+    </view>
+    <view name="analytics_scores" kind="VIEW" comment="source: unclustered/0021_analytics_scores.up.sql">
+      <query>SELECT
+    project_id,
+    toStartOfHour(timestamp) AS hour,
+    uniq(id) AS countScores,
+    max(source = 'ANNOTATION') AS hasAnnotation,
+    max(source = 'API') AS hasApi,
+    max(source = 'EVAL') AS hasEval,
+    max(observation_id IS NOT NULL) AS hasObservationScore,
+    max(session_id IS NOT NULL) AS hasSessionScore,
+    max(dataset_run_id IS NOT NULL) AS hasDatasetRunScore,
+    max(data_type = 'BOOLEAN') AS hasBoolScore,
+    max(data_type = 'NUMERIC') AS hasNumericScore,
+    max(data_type = 'CATEGORICAL') AS hasCategoricalScore,
+    max(comment IS NOT NULL) AS hasComment
+FROM
+    scores
+WHERE toStartOfHour(timestamp) &lt;= toStartOfHour(subtractHours(now(), 1))
+GROUP BY
+    project_id,
+    hour</query>
+    </view>
+    <view name="traces_all_amt_mv" kind="MATERIALIZED" comment="source: unclustered/0023_traces_aggregating_merge_trees.up.sql" if-not-exists="true" to="traces_all_amt">
+      <query>SELECT
+    -- Identifiers
+    tn.project_id                                                                              as project_id,
+    tn.id                                                                                      as id,
+    min(tn.start_time)                                                                         as timestamp,  -- Backward compatibility: redundant with start_time
+    min(tn.start_time)                                                                         as start_time,
+    max(coalesce(tn.end_time, tn.start_time))                                                  as end_time,
+    anyLast(tn.name)                                                                           as name,
+
+    -- Metadata properties
+    maxMap(tn.metadata)                                                                        as metadata,
+    anyLast(tn.user_id)                                                                        as user_id,
+    anyLast(tn.session_id)                                                                     as session_id,
+    anyLast(tn.environment)                                                                    as environment,
+    groupUniqArrayArray(tn.tags)                                                               as tags,
+    anyLast(tn.version)                                                                        as version,
+    anyLast(tn.release)                                                                        as release,
+
+    -- UI properties
+    argMaxState(tn.bookmarked, if(tn.bookmarked is not null, tn.event_ts, toDateTime64(0, 3))) as bookmarked,
+    argMaxState(tn.public, if(tn.public is not null, tn.event_ts, toDateTime64(0, 3)))         as public,
+
+    -- Aggregations
+    groupUniqArrayArray(tn.observation_ids)                                                    as observation_ids,
+    groupUniqArrayArray(tn.score_ids)                                                          as score_ids,
+    sumMap(tn.cost_details)                                                                    as cost_details,
+    sumMap(tn.usage_details)                                                                   as usage_details,
+
+    -- Input/Output
+    argMaxState(tn.input, if(tn.input &lt;&gt; '', tn.event_ts, toDateTime64(0, 3)))                 as input,
+    argMaxState(tn.output, if(tn.output &lt;&gt; '', tn.event_ts, toDateTime64(0, 3)))               as output,
+
+    min(tn.created_at)                                                                         as created_at,
+    max(tn.updated_at)                                                                         as updated_at
+FROM traces_null tn
+GROUP BY project_id, id</query>
+    </view>
+    <view name="traces_7d_amt_mv" kind="MATERIALIZED" comment="source: unclustered/0023_traces_aggregating_merge_trees.up.sql" if-not-exists="true" to="traces_7d_amt">
+      <query>SELECT
+    -- Identifiers
+    tn.project_id                                                                              as project_id,
+    tn.id                                                                                      as id,
+    min(tn.start_time)                                                                         as timestamp,  -- Backward compatibility: redundant with start_time
+    min(tn.start_time)                                                                         as start_time,
+    max(coalesce(tn.end_time, tn.start_time))                                                  as end_time,
+    anyLast(tn.name)                                                                           as name,
+
+    -- Metadata properties
+    maxMap(tn.metadata)                                                                        as metadata,
+    anyLast(tn.user_id)                                                                        as user_id,
+    anyLast(tn.session_id)                                                                     as session_id,
+    anyLast(tn.environment)                                                                    as environment,
+    groupUniqArrayArray(tn.tags)                                                               as tags,
+    anyLast(tn.version)                                                                        as version,
+    anyLast(tn.release)                                                                        as release,
+
+    -- UI properties
+    argMaxState(tn.bookmarked, if(tn.bookmarked is not null, tn.event_ts, toDateTime64(0, 3))) as bookmarked,
+    argMaxState(tn.public, if(tn.public is not null, tn.event_ts, toDateTime64(0, 3)))         as public,
+
+    -- Aggregations
+    groupUniqArrayArray(tn.observation_ids)                                                    as observation_ids,
+    groupUniqArrayArray(tn.score_ids)                                                          as score_ids,
+    sumMap(tn.cost_details)                                                                    as cost_details,
+    sumMap(tn.usage_details)                                                                   as usage_details,
+
+    -- Input/Output
+    argMaxState(tn.input, if(tn.input &lt;&gt; '', tn.event_ts, toDateTime64(0, 3)))                 as input,
+    argMaxState(tn.output, if(tn.output &lt;&gt; '', tn.event_ts, toDateTime64(0, 3)))               as output,
+
+    min(tn.created_at)                                                                         as created_at,
+    max(tn.updated_at)                                                                         as updated_at
+FROM traces_null tn
+GROUP BY project_id, id</query>
+    </view>
+    <view name="traces_30d_amt_mv" kind="MATERIALIZED" comment="source: unclustered/0023_traces_aggregating_merge_trees.up.sql" if-not-exists="true" to="traces_30d_amt">
+      <query>SELECT
+    -- Identifiers
+    tn.project_id                                                                              as project_id,
+    tn.id                                                                                      as id,
+    min(tn.start_time)                                                                         as timestamp,  -- Backward compatibility: redundant with start_time
+    min(tn.start_time)                                                                         as start_time,
+    max(coalesce(tn.end_time, tn.start_time))                                                  as end_time,
+    anyLast(tn.name)                                                                           as name,
+
+    -- Metadata properties
+    maxMap(tn.metadata)                                                                        as metadata,
+    anyLast(tn.user_id)                                                                        as user_id,
+    anyLast(tn.session_id)                                                                     as session_id,
+    anyLast(tn.environment)                                                                    as environment,
+    groupUniqArrayArray(tn.tags)                                                               as tags,
+    anyLast(tn.version)                                                                        as version,
+    anyLast(tn.release)                                                                        as release,
+
+    -- UI properties
+    argMaxState(tn.bookmarked, if(tn.bookmarked is not null, tn.event_ts, toDateTime64(0, 3))) as bookmarked,
+    argMaxState(tn.public, if(tn.public is not null, tn.event_ts, toDateTime64(0, 3)))         as public,
+
+    -- Aggregations
+    groupUniqArrayArray(tn.observation_ids)                                                    as observation_ids,
+    groupUniqArrayArray(tn.score_ids)                                                          as score_ids,
+    sumMap(tn.cost_details)                                                                    as cost_details,
+    sumMap(tn.usage_details)                                                                   as usage_details,
+
+    -- Input/Output
+    argMaxState(tn.input, if(tn.input &lt;&gt; '', tn.event_ts, toDateTime64(0, 3)))                 as input,
+    argMaxState(tn.output, if(tn.output &lt;&gt; '', tn.event_ts, toDateTime64(0, 3)))               as output,
+
+    min(tn.created_at)                                                                         as created_at,
+    max(tn.updated_at)                                                                         as updated_at
+FROM traces_null tn
+GROUP BY project_id, id</query>
+    </view>
+  </views>
+</database>

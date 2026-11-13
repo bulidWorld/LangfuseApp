@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    elementFormDefault="qualified"
+    attributeFormDefault="unqualified">
+    <xs:annotation>
+        <xs:documentation xml:lang="zh-CN">
+            ClickHouse 数据库定义。表结构适用于 MergeTree 系列表；表达式字段保留 ClickHouse SQL 原文。
+            视图使用 views/view/query；ALTER/DROP、索引物化、集群迁移、查询及其他未建模语句可放在
+            statements/statement/sql 中，sql 内容是原始 ClickHouse SQL，不由 XSD 解析或拆分。
+        </xs:documentation>
+    </xs:annotation>
+
+    <xs:element name="database">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="tables" type="TablesType" minOccurs="0" />
+                <xs:element name="views" type="ViewsType" minOccurs="0" />
+                <xs:element name="statements" type="StatementsType" minOccurs="0" />
+            </xs:sequence>
+            <xs:attribute name="name" type="SqlIdentifierType" use="required" />
+            <xs:attribute name="source" type="xs:string" use="optional" />
+            <xs:attribute name="dialect" type="DialectType" default="clickhouse" />
+        </xs:complexType>
+    </xs:element>
+
+    <xs:simpleType name="DialectType">
+        <xs:restriction base="xs:token">
+            <xs:enumeration value="clickhouse" />
+        </xs:restriction>
+    </xs:simpleType>
+    <xs:simpleType name="SqlIdentifierType">
+        <xs:restriction base="xs:string">
+            <xs:minLength value="1" />
+            <xs:maxLength value="255" />
+        </xs:restriction>
+    </xs:simpleType>
+    <xs:simpleType name="ColumnDefaultKindType">
+        <xs:restriction base="xs:token">
+            <xs:enumeration value="DEFAULT" />
+            <xs:enumeration value="MATERIALIZED" />
+            <xs:enumeration value="ALIAS" />
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="TablesType">
+        <xs:sequence>
+            <xs:element name="table" type="TableType" minOccurs="1" maxOccurs="unbounded" />
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="ViewsType">
+        <xs:sequence>
+            <xs:element name="view" type="ViewType" minOccurs="1" maxOccurs="unbounded" />
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="ViewType">
+        <xs:sequence>
+            <xs:element name="query" type="xs:string" />
+        </xs:sequence>
+        <xs:attribute name="name" type="SqlIdentifierType" use="required" />
+        <xs:attribute name="kind" type="ViewKindType" use="required" />
+        <xs:attribute name="on-cluster" type="SqlIdentifierType" use="optional" />
+        <xs:attribute name="to" type="SqlIdentifierType" use="optional" />
+        <xs:attribute name="if-not-exists" type="xs:boolean" default="false" />
+        <xs:attribute name="comment" type="xs:string" use="optional" />
+    </xs:complexType>
+    <xs:simpleType name="ViewKindType">
+        <xs:restriction base="xs:token">
+            <xs:enumeration value="VIEW" />
+            <xs:enumeration value="MATERIALIZED" />
+        </xs:restriction>
+    </xs:simpleType>
+    <xs:complexType name="TableType">
+        <xs:sequence>
+            <xs:element name="columns" type="ColumnsType" />
+            <xs:element name="indexes" type="IndexesType" minOccurs="0" />
+            <xs:element name="engine" type="EngineType" />
+            <xs:choice minOccurs="0" maxOccurs="unbounded">
+                <xs:element name="partition-by" type="ExpressionType" />
+                <xs:element name="primary-key" type="ExpressionType" />
+                <xs:element name="order-by" type="ExpressionType" />
+                <xs:element name="sample-by" type="ExpressionType" />
+                <xs:element name="ttl" type="ExpressionType" />
+                <xs:element name="settings" type="ExpressionType" />
+            </xs:choice>
+        </xs:sequence>
+        <xs:attribute name="name" type="SqlIdentifierType" use="required" />
+        <xs:attribute name="if-not-exists" type="xs:boolean" default="true" />
+        <xs:attribute name="on-cluster" type="SqlIdentifierType" use="optional" />
+        <xs:attribute name="comment" type="xs:string" use="optional" />
+    </xs:complexType>
+    <xs:complexType name="EngineType">
+        <xs:sequence>
+            <xs:element name="Cluster" type="EngineVariantType" />
+            <xs:element name="UnCluster" type="EngineVariantType" />
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="EngineVariantType">
+        <xs:attribute name="type" type="xs:string" use="required">
+            <xs:annotation>
+                <xs:documentation xml:lang="zh-CN">对应 Cluster 或 UnCluster 部署的引擎名称及参数，例如 ReplacingMergeTree(event_ts, is_deleted)、ReplicatedReplacingMergeTree(...) 或 Null。</xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+    </xs:complexType>
+    <xs:complexType name="ExpressionType" mixed="true">
+        <xs:attribute name="expression" type="xs:string" use="optional" />
+    </xs:complexType>
+
+    <xs:complexType name="ColumnsType">
+        <xs:sequence>
+            <xs:element name="column" type="ColumnType" minOccurs="1" maxOccurs="unbounded" />
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="ColumnType">
+        <xs:annotation>
+            <xs:documentation xml:lang="zh-CN">
+                type 填 ClickHouse 类型表达式，如 Nullable(String)、Map(LowCardinality(String), String)、
+                AggregateFunction(...) 或 SimpleAggregateFunction(...)。nullable 不单独建模；请将 Nullable(T) 写在 type 中。
+            </xs:documentation>
+        </xs:annotation>
+        <xs:attribute name="name" type="SqlIdentifierType" use="required" />
+        <xs:attribute name="type" type="xs:string" use="required" />
+        <xs:attribute name="default" type="xs:string" use="optional" />
+        <xs:attribute name="default-kind" type="ColumnDefaultKindType" use="optional" />
+        <xs:attribute name="codec" type="xs:string" use="optional" />
+        <xs:attribute name="comment" type="xs:string" use="optional" />
+    </xs:complexType>
+
+    <xs:complexType name="IndexesType">
+        <xs:sequence>
+            <xs:element name="index" type="IndexType" minOccurs="0" maxOccurs="unbounded" />
+        </xs:sequence>
+        <xs:attribute name="sync" type="xs:boolean" default="false">
+            <xs:annotation>
+                <xs:documentation xml:lang="zh-CN">true 表示 indexes 是目标完整集合；同步时会删除未声明的跳数索引。</xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+    </xs:complexType>
+    <xs:complexType name="IndexType">
+        <xs:attribute name="name" type="SqlIdentifierType" use="required" />
+        <xs:attribute name="expression" type="xs:string" use="required" />
+        <xs:attribute name="type" type="xs:string" use="required">
+            <xs:annotation>
+                <xs:documentation xml:lang="zh-CN">ClickHouse 跳数索引类型及参数，例如 bloom_filter(0.001)、minmax 或 tokenbf_v1(...).</xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="granularity" type="xs:positiveInteger" use="required" />
+        <xs:attribute name="if-not-exists" type="xs:boolean" default="true" />
+        <xs:attribute name="materialize" type="xs:boolean" default="false">
+            <xs:annotation>
+                <xs:documentation xml:lang="zh-CN">true 表示索引新增后应物化到已有数据；新建空表不需要物化。</xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="comment" type="xs:string" use="optional" />
+    </xs:complexType>
+
+    <xs:complexType name="StatementsType">
+        <xs:sequence>
+            <xs:element name="statement" type="StatementType" minOccurs="1" maxOccurs="unbounded" />
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="StatementType">
+        <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="sql" type="xs:string" />
+        </xs:sequence>
+        <xs:attribute name="id" type="SqlIdentifierType" use="required" />
+    </xs:complexType>
+</xs:schema>

@@ -1,0 +1,189 @@
+<?xml version='1.0' encoding='utf-8'?>
+<database xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="langfuse" source="packages/shared/prisma/schema.prisma" dialect="postgresql" xsi:noNamespaceSchemaLocation="database.xsd">
+  <tables>
+    <table name="audit_logs">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="type" type="&quot;AuditLogRecordType&quot; NOT NULL" nullable="true" default="'USER'" />
+        <column name="api_key_id" type="TEXT" nullable="true" />
+        <column name="user_id" type="TEXT" nullable="true" />
+        <column name="org_id" type="TEXT" nullable="false" />
+        <column name="user_org_role" type="TEXT" nullable="true" />
+        <column name="project_id" type="TEXT" nullable="true" />
+        <column name="user_project_role" type="TEXT" nullable="true" />
+        <column name="resource_type" type="TEXT" nullable="false" />
+        <column name="resource_id" type="TEXT" nullable="false" />
+        <column name="action" type="TEXT" nullable="false" />
+        <column name="before" type="TEXT" nullable="true" />
+        <column name="after" type="TEXT" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="audit_logs_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="audit_logs_project_id_idx" unique="false">
+          <column name="project_id" />
+        </index>
+        <index name="audit_logs_api_key_id_idx" unique="false">
+          <column name="api_key_id" />
+        </index>
+        <index name="audit_logs_user_id_idx" unique="false">
+          <column name="user_id" />
+        </index>
+        <index name="audit_logs_org_id_idx" unique="false">
+          <column name="org_id" />
+        </index>
+        <index name="audit_logs_created_at_idx" unique="false">
+          <column name="created_at" />
+        </index>
+        <index name="audit_logs_updated_at_idx" unique="false">
+          <column name="updated_at" />
+        </index>
+      </indexes>
+    </table>
+    <table name="posthog_integrations">
+      <columns>
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="encrypted_posthog_api_key" type="TEXT" nullable="false" />
+        <column name="posthog_host_name" type="TEXT" nullable="false" />
+        <column name="last_sync_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="enabled" type="BOOLEAN" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+      </columns>
+      <constraints>
+        <primary-key name="posthog_integrations_pkey" columns="project_id" />
+      </constraints>
+    </table>
+    <table name="blob_storage_integrations">
+      <columns>
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="type" type="&quot;BlobStorageIntegrationType&quot;" nullable="false" />
+        <column name="bucket_name" type="TEXT" nullable="false" />
+        <column name="prefix" type="TEXT" nullable="false" />
+        <column name="access_key_id" type="TEXT" nullable="true" />
+        <column name="secret_access_key" type="TEXT" nullable="true" />
+        <column name="region" type="TEXT" nullable="false" />
+        <column name="endpoint" type="TEXT" nullable="true" />
+        <column name="force_path_style" type="BOOLEAN" nullable="false" />
+        <column name="next_sync_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="last_sync_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="enabled" type="BOOLEAN" nullable="false" />
+        <column name="export_frequency" type="TEXT" nullable="false" />
+        <column name="file_type" type="&quot;BlobStorageIntegrationFileType&quot; NOT NULL" nullable="true" default="'CSV'" />
+        <column name="export_mode" type="&quot;BlobStorageExportMode&quot; NOT NULL" nullable="true" default="'FULL_HISTORY'" />
+        <column name="export_start_date" type="TIMESTAMP(3)" nullable="true" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+      </columns>
+      <constraints>
+        <primary-key name="blob_storage_integrations_pkey" columns="project_id" />
+      </constraints>
+    </table>
+    <table name="batch_exports">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="user_id" type="TEXT" nullable="false" />
+        <column name="finished_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="expires_at" type="TIMESTAMP(3)" nullable="true" />
+        <column name="name" type="TEXT" nullable="false" />
+        <column name="status" type="TEXT" nullable="false" />
+        <column name="query" type="JSONB" nullable="false" />
+        <column name="format" type="TEXT" nullable="false" />
+        <column name="url" type="TEXT" nullable="true" />
+        <column name="log" type="TEXT" nullable="true" />
+      </columns>
+      <constraints>
+        <primary-key name="batch_exports_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="batch_exports_project_id_user_id_idx" unique="false">
+          <column name="project_id" />
+          <column name="user_id" />
+        </index>
+        <index name="batch_exports_status_idx" unique="false">
+          <column name="status" />
+        </index>
+      </indexes>
+    </table>
+    <table name="billing_meter_backups">
+      <columns>
+        <column name="stripe_customer_id" type="TEXT" nullable="false" />
+        <column name="meter_id" type="TEXT" nullable="false" />
+        <column name="start_time" type="TIMESTAMP(3)" nullable="false" />
+        <column name="end_time" type="TIMESTAMP(3)" nullable="false" />
+        <column name="aggregated_value" type="INTEGER" nullable="false" />
+        <column name="event_name" type="TEXT" nullable="false" />
+        <column name="org_id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+      </columns>
+      <indexes>
+        <index name="billing_meter_backups_stripe_customer_id_meter_id_start_tim_idx" unique="false">
+          <column name="stripe_customer_id" />
+          <column name="meter_id" />
+          <column name="start_time" />
+          <column name="end_time" />
+        </index>
+        <index name="billing_meter_backups_stripe_customer_id_meter_id_start_tim_key" unique="true">
+          <column name="stripe_customer_id" />
+          <column name="meter_id" />
+          <column name="start_time" />
+          <column name="end_time" />
+        </index>
+      </indexes>
+    </table>
+    <table name="slack_integrations">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="team_id" type="TEXT" nullable="false" />
+        <column name="team_name" type="TEXT" nullable="false" />
+        <column name="bot_token" type="TEXT" nullable="false" />
+        <column name="bot_user_id" type="TEXT" nullable="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+      </columns>
+      <constraints>
+        <primary-key name="slack_integrations_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="slack_integrations_project_id_key" unique="true">
+          <column name="project_id" />
+        </index>
+        <index name="slack_integrations_team_id_idx" unique="false">
+          <column name="team_id" />
+        </index>
+      </indexes>
+    </table>
+    <table name="pending_deletions">
+      <columns>
+        <column name="id" type="TEXT" nullable="false" />
+        <column name="project_id" type="TEXT" nullable="false" ref-table="projects" ref-col="id" />
+        <column name="object" type="TEXT" nullable="false" />
+        <column name="object_id" type="TEXT" nullable="false" />
+        <column name="is_deleted" type="BOOLEAN NOT NULL" nullable="true" default="false" />
+        <column name="created_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+        <column name="updated_at" type="TIMESTAMP(3) NOT NULL" nullable="true" default="CURRENT_TIMESTAMP" />
+      </columns>
+      <constraints>
+        <primary-key name="pending_deletions_pkey" columns="id" />
+      </constraints>
+      <indexes>
+        <index name="pending_deletions_project_id_object_is_deleted_idx" unique="false">
+          <column name="project_id" />
+          <column name="object" />
+          <column name="is_deleted" />
+        </index>
+        <index name="pending_deletions_object_id_object_idx" unique="false">
+          <column name="object_id" />
+          <column name="object" />
+        </index>
+      </indexes>
+    </table>
+  </tables>
+</database>

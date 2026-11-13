@@ -1,0 +1,154 @@
+<?xml version='1.0' encoding='utf-8'?>
+<database name="langfuse" source="packages/shared/clickhouse/migrations/{clustered,unclustered}/*.up.sql" dialect="clickhouse">
+  <tables>
+    <table name="traces" on-cluster="default" comment="原始追踪记录表，保存 trace 的标识、时间、输入输出及用户可见属性。">
+      <columns>
+        <column name="id" type="String" comment="Trace 标识。" />
+        <column name="timestamp" type="DateTime64(3)" comment="Trace 的业务时间，通常取 trace 开始时间。" />
+        <column name="name" type="String" comment="Trace 名称。" />
+        <column name="user_id" type="Nullable(String)" comment="触发或关联的用户标识。" />
+        <column name="metadata" type="Map(LowCardinality(String), String)" comment="用户提供的键值元数据。" />
+        <column name="release" type="Nullable(String)" comment="写入该记录的应用发布版本。" />
+        <column name="version" type="Nullable(String)" comment="写入该记录的应用或数据版本。" />
+        <column name="project_id" type="String" comment="Langfuse 项目标识，用于隔离和筛选项目数据。" />
+        <column name="environment" type="LowCardinality(String)" default-kind="DEFAULT" default="'default'" comment="记录所属环境名称；未指定时使用 default。" />
+        <column name="public" type="Bool" comment="是否公开该 trace。" />
+        <column name="bookmarked" type="Bool" comment="trace 是否已收藏。" />
+        <column name="tags" type="Array(String)" comment="附加到 trace 的标签集合。" />
+        <column name="input" type="Nullable(String)" codec="(ZSTD(3))" comment="Trace 输入内容，通常为序列化后的 JSON 字符串。" />
+        <column name="output" type="Nullable(String)" codec="(ZSTD(3))" comment="Trace 输出内容，通常为序列化后的 JSON 字符串。" />
+        <column name="session_id" type="Nullable(String)" comment="关联的会话标识。" />
+        <column name="created_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录首次创建时间。" />
+        <column name="updated_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录最近一次业务更新时间。" />
+        <column name="event_ts" type="DateTime64(3)" comment="记录变更版本时间，用于 ReplacingMergeTree 选择较新的版本。" />
+        <column name="is_deleted" type="UInt8" comment="软删除标记；1 表示记录已删除，0 表示有效。" />
+      </columns>
+      <indexes>
+        <index name="idx_id" expression="id" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_res_metadata_key" expression="mapKeys(metadata)" type="bloom_filter(0.01)" granularity="1" />
+        <index name="idx_res_metadata_value" expression="mapValues(metadata)" type="bloom_filter(0.01)" granularity="1" />
+        <index name="idx_session_id" expression="session_id" type="bloom_filter()" granularity="1" materialize="true" />
+        <index name="idx_user_id" expression="user_id" type="bloom_filter()" granularity="1" materialize="true" />
+      </indexes>
+      <engine>
+        <Cluster type="ReplicatedReplacingMergeTree(event_ts, is_deleted)" />
+        <UnCluster type="ReplacingMergeTree(event_ts, is_deleted)" />
+      </engine>
+      <partition-by>toYYYYMM(timestamp)</partition-by>
+      <primary-key>(
+     project_id,
+     toDate(timestamp)
+)</primary-key>
+      <order-by>(
+    project_id,
+    toDate(timestamp),
+    id
+)</order-by>
+    </table>
+    <table name="observations" on-cluster="default" comment="Trace 下的 observation 记录表，保存 span、generation 等观测及模型用量、费用信息。">
+      <columns>
+        <column name="id" type="String" comment="Observation 标识。" />
+        <column name="trace_id" type="String" comment="关联的 trace 标识；可空表示该记录不关联 trace。" />
+        <column name="project_id" type="String" comment="Langfuse 项目标识，用于隔离和筛选项目数据。" />
+        <column name="environment" type="LowCardinality(String)" default-kind="DEFAULT" default="'default'" comment="记录所属环境名称；未指定时使用 default。" />
+        <column name="type" type="LowCardinality(String)" comment="Observation 类型，例如 SPAN、GENERATION 或 EVENT。" />
+        <column name="parent_observation_id" type="Nullable(String)" comment="父级 observation 标识，用于表示 observation 的层级关系。" />
+        <column name="start_time" type="DateTime64(3)" comment="操作或 trace 的开始时间。" />
+        <column name="end_time" type="Nullable(DateTime64(3))" comment="操作或 trace 的结束时间；未结束时为空。" />
+        <column name="name" type="String" comment="操作、span 或 generation 的名称。" />
+        <column name="metadata" type="Map(LowCardinality(String), String)" comment="用户提供的键值元数据。" />
+        <column name="level" type="LowCardinality(String)" comment="observation 严重级别，例如 DEFAULT、DEBUG、WARNING 或 ERROR。" />
+        <column name="status_message" type="Nullable(String)" comment="observation 的状态说明或错误信息。" />
+        <column name="version" type="Nullable(String)" comment="写入该记录的应用或数据版本。" />
+        <column name="input" type="Nullable(String)" codec="(ZSTD(3))" comment="Observation 输入内容，通常为序列化后的 JSON 字符串。" />
+        <column name="output" type="Nullable(String)" codec="(ZSTD(3))" comment="Observation 输出内容，通常为序列化后的 JSON 字符串。" />
+        <column name="provided_model_name" type="Nullable(String)" comment="请求中由调用方提供的模型名称。" />
+        <column name="internal_model_id" type="Nullable(String)" comment="Langfuse 内部模型目录中的模型标识。" />
+        <column name="model_parameters" type="Nullable(String)" comment="模型调用参数的序列化内容。" />
+        <column name="provided_usage_details" type="Map(LowCardinality(String), UInt64)" comment="由调用方或模型提供商报告的 token 等原始用量明细。" />
+        <column name="usage_details" type="Map(LowCardinality(String), UInt64)" comment="规范化后的 token 用量明细，供统计与费用计算使用。" />
+        <column name="provided_cost_details" type="Map(LowCardinality(String), Decimal64(12))" comment="由调用方或模型提供商报告的原始费用明细。" />
+        <column name="cost_details" type="Map(LowCardinality(String), Decimal64(12))" comment="根据模型定价等信息计算出的费用明细。" />
+        <column name="total_cost" type="Nullable(Decimal64(12))" comment="该 observation 的总费用。" />
+        <column name="completion_start_time" type="Nullable(DateTime64(3))" comment="生成内容开始返回的时间，用于计算首 token 延迟。" />
+        <column name="prompt_id" type="Nullable(String)" comment="关联的 prompt 标识。" />
+        <column name="prompt_name" type="Nullable(String)" comment="关联的 prompt 名称快照。" />
+        <column name="prompt_version" type="Nullable(UInt16)" comment="关联的 prompt 版本号。" />
+        <column name="created_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录首次创建时间。" />
+        <column name="updated_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录最近一次业务更新时间。" />
+        <column name="event_ts" type="DateTime64(3)" comment="记录变更版本时间，用于 ReplacingMergeTree 选择较新的版本。" />
+        <column name="is_deleted" type="UInt8" comment="软删除标记；1 表示记录已删除，0 表示有效。" />
+      </columns>
+      <indexes sync="true">
+        <index name="idx_id" expression="id" type="bloom_filter()" granularity="1" />
+        <index name="idx_trace_id" expression="trace_id" type="bloom_filter()" granularity="1" />
+        <index name="idx_res_metadata_key" expression="mapKeys(metadata)" type="bloom_filter(0.01)" granularity="1" materialize="true" />
+        <index name="idx_res_metadata_value" expression="mapValues(metadata)" type="bloom_filter(0.01)" granularity="1" materialize="true" />
+      </indexes>
+      <engine>
+        <Cluster type="ReplicatedReplacingMergeTree(event_ts, is_deleted)" />
+        <UnCluster type="ReplacingMergeTree(event_ts, is_deleted)" />
+      </engine>
+      <partition-by>toYYYYMM(start_time)</partition-by>
+      <primary-key>(
+    project_id,
+    `type`,
+    toDate(start_time)
+)</primary-key>
+      <order-by>(
+    project_id,
+    `type`,
+    toDate(start_time),
+    id
+)</order-by>
+    </table>
+    <table name="scores" on-cluster="default" comment="评分记录表，保存评分值、类型、来源及其关联的 trace、observation、session 或数据集运行。">
+      <columns>
+        <column name="id" type="String" comment="评分记录标识。" />
+        <column name="timestamp" type="DateTime64(3)" comment="评分对应的业务时间。" />
+        <column name="project_id" type="String" comment="Langfuse 项目标识，用于隔离和筛选项目数据。" />
+        <column name="environment" type="LowCardinality(String)" default-kind="DEFAULT" default="'default'" comment="记录所属环境名称；未指定时使用 default。" />
+        <column name="trace_id" type="Nullable(String)" comment="关联的 trace 标识；可空表示该记录不关联 trace。" />
+        <column name="session_id" type="Nullable(String)" comment="关联的会话标识。" />
+        <column name="dataset_run_id" type="Nullable(String)" comment="关联的数据集运行标识。" />
+        <column name="observation_id" type="Nullable(String)" comment="关联的 observation 标识；可空表示不关联 observation。" />
+        <column name="name" type="String" comment="评分项名称。" />
+        <column name="value" type="Float64" comment="数值型评分值；非数值评分时可能为空。" />
+        <column name="source" type="String" comment="评分来源，例如 API、ANNOTATION 或 EVAL。" />
+        <column name="comment" type="Nullable(String)" codec="(ZSTD(1))" comment="评分附带的文本说明。" />
+        <column name="metadata" type="Map(LowCardinality(String), String)" comment="用户提供的键值元数据。" />
+        <column name="author_user_id" type="Nullable(String)" comment="创建评分的用户标识。" />
+        <column name="config_id" type="Nullable(String)" comment="评分所使用的配置标识。" />
+        <column name="data_type" type="String" comment="评分数据类型，例如 NUMERIC、CATEGORICAL 或 BOOLEAN。" />
+        <column name="string_value" type="Nullable(String)" comment="分类或布尔评分的字符串值。" />
+        <column name="queue_id" type="Nullable(String)" comment="产生该评分的评估队列标识。" />
+        <column name="created_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录首次创建时间。" />
+        <column name="updated_at" type="DateTime64(3)" default-kind="DEFAULT" default="now()" comment="该记录最近一次业务更新时间。" />
+        <column name="event_ts" type="DateTime64(3)" comment="记录变更版本时间，用于 ReplacingMergeTree 选择较新的版本。" />
+        <column name="is_deleted" type="UInt8" comment="软删除标记；1 表示记录已删除，0 表示有效。" />
+      </columns>
+      <indexes>
+        <index name="idx_id" expression="id" type="bloom_filter(0.001)" granularity="1" />
+        <index name="idx_project_trace_observation" expression="(project_id, trace_id, observation_id)" type="bloom_filter(0.001)" granularity="1" materialize="true" />
+        <index name="idx_project_session" expression="(project_id, session_id)" type="bloom_filter(0.001)" granularity="1" materialize="true" />
+        <index name="idx_project_dataset_run" expression="(project_id, dataset_run_id)" type="bloom_filter(0.001)" granularity="1" materialize="true" />
+      </indexes>
+      <engine>
+        <Cluster type="ReplicatedReplacingMergeTree(event_ts, is_deleted)" />
+        <UnCluster type="ReplacingMergeTree(event_ts, is_deleted)" />
+      </engine>
+      <partition-by>toYYYYMM(timestamp)</partition-by>
+      <primary-key>(
+    project_id,
+    toDate(timestamp),
+    name
+)</primary-key>
+      <order-by>(
+    project_id,
+    toDate(timestamp),
+    name,
+    id
+)</order-by>
+    </table>
+  </tables>
+</database>
