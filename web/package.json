@@ -94,7 +94,7 @@
     "@trpc/next": "^10.45.0",
     "@trpc/react-query": "^10.45.0",
     "@trpc/server": "^10.45.0",
-    "@uiw/codemirror-themes": "^4.23.7",
+    "@uiw/codemirror-themes": "^4.25.12",
     "@uiw/react-codemirror": "^4.24.1",
     "ai": "^3.4.9",
     "bcryptjs": "^2.4.3",
