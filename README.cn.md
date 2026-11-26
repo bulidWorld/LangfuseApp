@@ -355,3 +355,5 @@ _[Langfuse 中的公共示例追踪](https://cloud.langfuse.com/project/cloramnk
 ```
 
 ```
+
+docker build -f web/Dockerfile -t langfuse-web .

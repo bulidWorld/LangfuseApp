@@ -36,7 +36,6 @@ import { Turnstile } from "@marsidev/react-turnstile";
 import { isAnySsoConfigured } from "@/src/ee/features/multi-tenant-sso/utils";
 import { Code } from "lucide-react";
 import { useRouter } from "next/router";
-import { captureException } from "@sentry/nextjs";
 import { usePostHogClientCapture } from "@/src/features/posthog-analytics/usePostHogClientCapture";
 import { openChat } from "@/src/features/support-chat/PlainChat";
 
@@ -415,13 +414,6 @@ export default function SignIn({
   const nextAuthErrorDescription = signInErrors.find(
     (e) => e.code === nextAuthError,
   )?.description;
-  useEffect(() => {
-    // log unexpected sign in errors to Sentry
-    if (nextAuthError && !nextAuthErrorDescription) {
-      captureException(new Error(`Sign in error: ${nextAuthError}`));
-    }
-  }, [nextAuthError, nextAuthErrorDescription]);
-
   const [credentialsFormError, setCredentialsFormError] = useState<
     string | null
   >(nextAuthErrorDescription ?? nextAuthError);
@@ -462,21 +454,12 @@ export default function SignIn({
       });
       if (result === undefined) {
         setCredentialsFormError("An unexpected error occurred.");
-        captureException(new Error("Sign in result is undefined"));
       } else if (!result.ok) {
-        if (!result.error) {
-          captureException(
-            new Error(
-              `Sign in result error is falsy, result: ${JSON.stringify(result)}`,
-            ),
-          );
-        }
         setCredentialsFormError(
           result?.error ?? "An unexpected error occurred.",
         );
       }
     } catch (error) {
-      captureException(error);
       console.error(error);
       setCredentialsFormError("An unexpected error occurred.");
     } finally {

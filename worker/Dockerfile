@@ -1,29 +1,27 @@
-FROM --platform=${TARGETPLATFORM:-linux/amd64} node:20-alpine AS alpine
+FROM node:20-alpine AS base
 RUN sed -i 's|https://dl-cdn.alpinelinux.org/alpine|https://mirrors.tuna.tsinghua.edu.cn/alpine|g' /etc/apk/repositories
 
-# It's important to update the index before installing packages to ensure you're getting the latest versions.
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk update && apk upgrade --no-cache libcrypto3 libssl3 libc6-compat busybox ssl_client
+RUN apk upgrade --no-cache libcrypto3 libssl3 libc6-compat busybox ssl_client && \
+    apk add --no-cache openssl
 
+FROM base AS build-tools
 
-FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine AS base
-RUN npm config set registry https://registry.npmmirror.com && npm install --registry=https://registry.npmmirror.com turbo@^2.5.6 --global
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
-RUN npm_config_registry=https://registry.npmmirror.com corepack prepare pnpm@9.5.0 --activate
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install turbo@^2.5.6 --global && \
+    corepack enable && \
+    npm_config_registry=https://registry.npmmirror.com corepack prepare pnpm@9.5.0 --activate
 
-
-FROM --platform=${TARGETPLATFORM:-linux/amd64} base AS pruner
+FROM build-tools AS pruner
 
 WORKDIR /app
 
 COPY . .
 RUN turbo prune --scope=worker --docker
 
-
-
-FROM --platform=${TARGETPLATFORM:-linux/amd64} base AS builder
+FROM build-tools AS workspace
 
 WORKDIR /app
 
@@ -32,7 +30,12 @@ COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=pruner /app/out/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=pruner /app/out/json/ .
 
-RUN pnpm install --frozen-lockfile --registry=https://registry.npmmirror.com
+ARG TARGETARCH
+
+FROM workspace AS builder
+
+RUN --mount=type=cache,id=langfuse-worker-pnpm-${TARGETARCH},target=/pnpm/store \
+    pnpm install --frozen-lockfile --store-dir=/pnpm/store
 
 # pass public variables in build step
 ARG NEXT_PUBLIC_LANGFUSE_CLOUD_REGION
@@ -46,30 +49,48 @@ COPY --from=pruner /app/out/full/ .
 
 RUN turbo run build --filter=worker...
 
-FROM --platform=${TARGETPLATFORM:-linux/amd64} base AS runner
+FROM workspace AS production-deps
 
-ARG TARGETPLATFORM
-ARG BUILDPLATFORM
+# The root install hooks are only used for development.
+RUN --mount=type=cache,id=langfuse-worker-pnpm-${TARGETARCH},target=/pnpm/store \
+    npm pkg delete scripts.preinstall scripts.prepare && \
+    PRISMA_SKIP_POSTINSTALL_GENERATE=true \
+    pnpm install --prod --frozen-lockfile --store-dir=/pnpm/store
+
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/worker/dist ./worker/dist
+
+# Copy the generated Prisma client into the production dependency tree.
+RUN --mount=type=bind,from=builder,source=/app,target=/build \
+    set -eu; \
+    build_client=$(node -p 'require.resolve("@prisma/client", { paths: ["/build/packages/shared"] })'); \
+    runtime_client=$(node -p 'require.resolve("@prisma/client", { paths: ["/app/packages/shared"] })'); \
+    build_generated="$(dirname "$build_client")/../../.prisma/client"; \
+    runtime_generated="$(dirname "$runtime_client")/../../.prisma/client"; \
+    test -f "$build_generated/schema.prisma"; \
+    mkdir -p "$runtime_generated"; \
+    cp -a "$build_generated/." "$runtime_generated/"
+
+FROM base AS runner
 
 RUN apk add --no-cache dumb-init
 
 WORKDIR /app
 
-ARG NEXT_PUBLIC_BUILD_ID
-ENV BUILD_ID=$NEXT_PUBLIC_BUILD_ID
+ENV NODE_ENV=production
+ENV DOCKER_BUILD=0
 
-ENV NODE_ENV production
-ENV DOCKER_BUILD 0
-
-# Don't run production as root
 ARG UID=1001
 ARG GID=1001
-RUN addgroup --system --gid ${GID} expressjs
-RUN adduser --system --uid ${UID} expressjs
+RUN addgroup --system --gid "${GID}" expressjs && \
+    adduser --system --uid "${UID}" --ingroup expressjs expressjs
+
+COPY --from=production-deps --chown=expressjs:expressjs /app ./
+COPY --chown=expressjs:expressjs --chmod=755 ./worker/entrypoint.sh ./worker/entrypoint.sh
 USER expressjs
-COPY --from=builder --chown=expressjs:expressjs /app .
-COPY --chown=expressjs:expressjs ./worker/entrypoint.sh ./worker/entrypoint.sh
-RUN chmod +x ./worker/entrypoint.sh
+
+ARG NEXT_PUBLIC_BUILD_ID
+ENV BUILD_ID=$NEXT_PUBLIC_BUILD_ID
 
 EXPOSE 3030
 ENV PORT=3030

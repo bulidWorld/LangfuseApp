@@ -1,10 +1,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: clickhouse-create-langfuse-db
+  # Jobs have immutable pod templates. Bump this suffix when changing the template.
+  name: clickhouse-create-langfuse-db-v2
   namespace: langfuse
 spec:
   backoffLimit: 6
+  ttlSecondsAfterFinished: 3600
   template:
     spec:
       restartPolicy: OnFailure

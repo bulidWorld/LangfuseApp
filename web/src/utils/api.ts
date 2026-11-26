@@ -5,7 +5,6 @@
  * We also create a few inference helpers for input and output types.
  */
 
-import { captureException } from "@sentry/nextjs";
 import {
   createTRPCProxyClient,
   httpBatchLink,
@@ -71,13 +70,6 @@ const handleTrpcError = (error: unknown) => {
         return;
       }
     }
-    // Only send server errors (5xx) to Sentry, not client errors (4xx)
-    if (httpStatus >= 500 && httpStatus < 600) {
-      captureException(error);
-    }
-  } else {
-    // For non-TRPC errors, still send to Sentry
-    captureException(error);
   }
 
   trpcErrorToast(error);
@@ -129,9 +121,7 @@ export const api = createTRPCNext<AppRouter>({
       links: [
         buildIdLink(),
         loggerLink({
-          // Only enable in development - production logs would be captured by Sentry
-          // in an unreadable format. We handle 5xx errors via captureException() in
-          // handleTrpcError and use DataDog for additional server-side logging.
+          // Only enable in development; server-side logging is handled by DataDog.
           enabled: () => process.env.NODE_ENV === "development",
         }),
         splitLink({
@@ -187,9 +177,7 @@ export const directApi = createTRPCProxyClient<AppRouter>({
   transformer: superjson,
   links: [
     loggerLink({
-      // Only enable in development - production logs would be captured by Sentry
-      // in an unreadable format. We handle 5xx errors via captureException() in
-      // handleTrpcError and use DataDog for additional server-side logging.
+      // Only enable in development; server-side logging is handled by DataDog.
       enabled: () => process.env.NODE_ENV === "development",
     }),
     httpBatchLink({
