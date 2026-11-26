@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pg-langfuse-auth
+  namespace: database
+  labels:
+    cnpg.io/reload: "true"
+type: kubernetes.io/basic-auth
+stringData:
+  username: langfuse
+  # Keep this password in sync with POSTGRES_PASSWORD in langfuse-secrets.
+  password: "Changeme_123"
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: pg-ha-langfuse
+  namespace: database
+spec:
+  cluster:
+    name: pg-ha
+  name: langfuse
+  login: true
+  passwordSecret:
+    name: pg-langfuse-auth
+  databaseRoleReclaimPolicy: retain
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: pg-ha-langfuse
+  namespace: database
+spec:
+  cluster:
+    name: pg-ha
+  name: langfuse
+  owner: langfuse
+  databaseReclaimPolicy: retain
+  extensions:
+    - name: pg_stat_statements

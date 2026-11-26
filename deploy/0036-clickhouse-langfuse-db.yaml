@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clickhouse-create-langfuse-db
+  namespace: langfuse
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-database-and-user
+          image: clickhouse/clickhouse-server:24.12
+          command: ["sh", "-c"]
+          args:
+            - |
+              until clickhouse-client \
+                --host chi-clickhouse-installation-ck-db01-0-0.clickhouse.svc.cluster.local \
+                --user admin \
+                --password "$CLICKHOUSE_ADMIN_PASSWORD" \
+                --query "SELECT 1" >/dev/null 2>&1; do
+                echo "Waiting for ClickHouse..."
+                sleep 5
+              done
+              exec clickhouse-client \
+                --host chi-clickhouse-installation-ck-db01-0-0.clickhouse.svc.cluster.local \
+                --user admin \
+                --password "$CLICKHOUSE_ADMIN_PASSWORD" \
+                --query "CREATE DATABASE IF NOT EXISTS langfuse; CREATE USER IF NOT EXISTS langfuse-db IDENTIFIED WITH plaintext_password BY 'Changeme_123'; GRANT ALL ON langfuse.* TO langfuse-db"
+          env:
+            - name: CLICKHOUSE_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-secrets
+                  key: CLICKHOUSE_ADMIN_PASSWORD

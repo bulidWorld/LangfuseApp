@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<executionPlan xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:noNamespaceSchemaLocation="../deployment-plan.xsd">
+  <step name="创建 Langfuse 命名空间">
+    <serverSideApply>
+      <file>0001-langfuse-namespace.yaml</file>
+    </serverSideApply>
+  </step>
+  <step name="创建 Langfuse 应用凭据">
+    <serverSideApply>
+      <file>0010-langfuse-secrets.yaml</file>
+    </serverSideApply>
+  </step>
+  <step name="初始化 PostgreSQL Langfuse 用户和数据库">
+    <serverSideApply>
+      <file>0015-langfuse-initPostgreDatabaseDep.yaml</file>
+    </serverSideApply>
+  </step>
+  <step name="创建 ClickHouse Langfuse 数据库">
+    <serverSideApply>
+      <file>0036-clickhouse-langfuse-db.yaml</file>
+    </serverSideApply>
+  </step>
+  <step name="部署 Langfuse Web 和 Worker">
+    <serverSideApply>
+      <file>0040-langfuse-deploy.yaml</file>
+    </serverSideApply>
+  </step>
+</executionPlan>
