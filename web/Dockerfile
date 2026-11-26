@@ -1,20 +1,21 @@
 FROM node:20-bookworm-slim AS base
 RUN printf '%s\n' \
     'Types: deb' \
-    'URIs: https://mirrors.tuna.tsinghua.edu.cn/debian' \
+    'URIs: http://mirrors.tuna.tsinghua.edu.cn/debian' \
     'Suites: bookworm bookworm-updates' \
     'Components: main' \
     'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' \
     '' \
     'Types: deb' \
-    'URIs: https://mirrors.tuna.tsinghua.edu.cn/debian-security' \
+    'URIs: http://mirrors.tuna.tsinghua.edu.cn/debian-security' \
     'Suites: bookworm-security' \
     'Components: main' \
     'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' \
     > /etc/apt/sources.list.d/debian.sources
 RUN npm config set registry https://registry.npmmirror.com
-RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
-    apt-get install -y --no-install-recommends ca-certificates && \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && \
+    sed -i 's|http://mirrors.tuna.tsinghua.edu.cn|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get upgrade -y --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 RUN npm install --registry=https://registry.npmmirror.com turbo@^2.5.6 --global
 ENV PNPM_HOME="/pnpm"
