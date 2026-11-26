@@ -1,12 +1,20 @@
 FROM node:20-bookworm-slim AS base
+RUN sed -i \
+    -e 's|http://deb.debian.org/debian|https://mirrors.tuna.tsinghua.edu.cn/debian|g' \
+    -e 's|http://security.debian.org/debian-security|https://mirrors.tuna.tsinghua.edu.cn/debian-security|g' \
+    -e 's|http://deb.debian.org/debian-security|https://mirrors.tuna.tsinghua.edu.cn/debian-security|g' \
+    -e 's|https://deb.debian.org/debian|https://mirrors.tuna.tsinghua.edu.cn/debian|g' \
+    -e 's|https://security.debian.org/debian-security|https://mirrors.tuna.tsinghua.edu.cn/debian-security|g' \
+    /etc/apt/sources.list.d/debian.sources
+RUN npm config set registry https://registry.npmmirror.com
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends ca-certificates && \
     rm -rf /var/lib/apt/lists/*
-RUN npm install turbo@^2.5.6 --global
+RUN npm install --registry=https://registry.npmmirror.com turbo@^2.5.6 --global
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
-RUN corepack prepare pnpm@9.5.0 --activate
+RUN npm_config_registry=https://registry.npmmirror.com corepack prepare pnpm@9.5.0 --activate
 
 FROM base AS pruner
 
@@ -24,7 +32,7 @@ COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=pruner /app/out/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=pruner /app/out/json/ .
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --registry=https://registry.npmmirror.com
 
 ENV DOCKER_BUILD=1
 ENV NEXT_MANUAL_SIG_HANDLE=true
@@ -108,7 +116,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends dumb-init tzdata python3 python3-pip && \
     rm -rf /var/lib/apt/lists/*
 COPY ./scripts/requirements.txt ./scripts/requirements.txt
-RUN python3 -m pip install --break-system-packages --no-cache-dir -r ./scripts/requirements.txt
+RUN python3 -m pip install --break-system-packages --no-cache-dir \
+    --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+    -r ./scripts/requirements.txt
 
 # Don't run production as root
 ARG UID=1001
@@ -119,7 +129,7 @@ RUN adduser --system --uid ${UID} --ingroup nodejs nextjs
 # Install dd-trace only if NEXT_PUBLIC_LANGFUSE_CLOUD_REGION is configured
 ARG NEXT_PUBLIC_LANGFUSE_CLOUD_REGION
 RUN if [ -n "$NEXT_PUBLIC_LANGFUSE_CLOUD_REGION" ]; then \
-        npm install --no-package-lock --no-save dd-trace@5.36.0; \
+        npm install --registry=https://registry.npmmirror.com --no-package-lock --no-save dd-trace@5.36.0; \
     fi
 
 COPY --from=builder --chown=nextjs:nodejs /app/web/next.config.mjs .
