@@ -11,6 +11,11 @@
       <file>0010-langfuse-secrets.yaml</file>
     </serverSideApply>
   </step>
+  <step name="创建 Langfuse 配置">
+    <serverSideApply>
+      <file>0011-langfuse-configmap.yaml</file>
+    </serverSideApply>
+  </step>
   <step name="初始化 PostgreSQL Langfuse 用户和数据库">
     <serverSideApply>
       <file>0015-langfuse-initPostgreDatabaseDep.yaml</file>

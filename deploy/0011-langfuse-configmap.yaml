@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: langfuse-config
+  namespace: langfuse
+data:
+  LANGFUSE_LOG_LEVEL: info
