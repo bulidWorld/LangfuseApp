@@ -12,7 +12,8 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN npm config set registry https://registry.npmmirror.com && \
     npm install turbo@^2.5.6 --global && \
     corepack enable && \
-    npm_config_registry=https://registry.npmmirror.com corepack prepare pnpm@9.5.0 --activate
+    npm_config_registry=https://registry.npmmirror.com corepack prepare pnpm@9.5.0 --activate && \
+    pnpm config set registry https://registry.npmmirror.com
 
 FROM build-tools AS pruner
 
