@@ -44,7 +44,7 @@ COPY --from=pruner /app/out/json/ .
 
 ARG TARGETARCH
 RUN --mount=type=cache,id=langfuse-web-pnpm-${TARGETARCH},target=/pnpm/store \
-    pnpm install --frozen-lockfile --store-dir=/pnpm/store --reporter=ndjson
+    pnpm install --frozen-lockfile --store-dir=/pnpm/store
 
 ENV DOCKER_BUILD=1
 
